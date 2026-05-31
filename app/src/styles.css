@@ -45,7 +45,8 @@ button {
 
 .brand-lockup,
 .app-actions,
-.gas-faucet {
+.gas-faucet,
+.token-faucet {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -255,7 +256,8 @@ h2 {
   color: #d9c99d;
 }
 
-.gas-faucet {
+.gas-faucet,
+.token-faucet {
   flex-wrap: wrap;
 }
 
@@ -303,6 +305,7 @@ li .secondary-button {
 
   .app-actions,
   .gas-faucet,
+  .token-faucet,
   .local-test-panel {
     width: 100%;
   }
@@ -314,6 +317,7 @@ li .secondary-button {
 
   .app-actions > *,
   .gas-faucet .secondary-button,
+  .token-faucet .secondary-button,
   .local-test-panel .secondary-button {
     width: 100%;
   }

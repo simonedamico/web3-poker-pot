@@ -1,6 +1,7 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useMemo, useState } from "react";
 import { HardhatGasButton } from "./components/HardhatGasButton";
+import { LocalTokenMintButton } from "./components/LocalTokenMintButton";
 import { CreateGamePage } from "./pages/CreateGamePage";
 import { GamePage } from "./pages/GamePage";
 import "./styles.css";
@@ -27,6 +28,7 @@ export function App() {
         </div>
         <div className="app-actions">
           <HardhatGasButton />
+          <LocalTokenMintButton />
           <ConnectButton />
         </div>
       </header>

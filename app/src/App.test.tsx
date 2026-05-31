@@ -20,6 +20,10 @@ vi.mock("./components/HardhatGasButton", () => ({
   HardhatGasButton: () => <button type="button">Get hardhat gas</button>,
 }));
 
+vi.mock("./components/LocalTokenMintButton", () => ({
+  LocalTokenMintButton: () => <button type="button">Get buy-in tokens</button>,
+}));
+
 describe("App", () => {
   it("renders the create-game view by default", () => {
     render(<App />);
@@ -38,6 +42,12 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("button", { name: "Get hardhat gas" })).toBeInTheDocument();
+  });
+
+  it("renders the local buy-in token control", () => {
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: "Get buy-in tokens" })).toBeInTheDocument();
   });
 
   it("uses poker table branding in the toolbar", () => {
