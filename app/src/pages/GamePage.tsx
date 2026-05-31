@@ -25,7 +25,14 @@ export function GamePage({ gameId }: GamePageProps) {
         <p className="muted">Organiser controls appear when the connected wallet owns this game.</p>
       </section>
 
-      <FinalizeForm pot={0n} decimals={6} onFinalize={() => undefined} />
+      <FinalizeForm
+        pot={0n}
+        decimals={6}
+        disabled={false}
+        error={null}
+        isPending={false}
+        onFinalize={() => undefined}
+      />
     </section>
   );
 }

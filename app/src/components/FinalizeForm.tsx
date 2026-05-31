@@ -7,6 +7,9 @@ type DraftRow = { recipient: string; amount: string };
 type FinalizeFormProps = {
   pot: bigint;
   decimals: number;
+  disabled?: boolean;
+  error?: string | null;
+  isPending?: boolean;
   onFinalize: (rows: PayoutInput[]) => void;
 };
 
@@ -18,6 +21,10 @@ type ParsedRow = {
 };
 
 const EMPTY_ROW: DraftRow = { recipient: "", amount: "" };
+
+function isBlankRow(row: DraftRow) {
+  return row.recipient.trim().length === 0 && row.amount.trim().length === 0;
+}
 
 function parseDraftRow(row: DraftRow, decimals: number): ParsedRow {
   const parsed: ParsedRow = {};
@@ -45,14 +52,29 @@ function parseDraftRow(row: DraftRow, decimals: number): ParsedRow {
   return parsed;
 }
 
-export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
+export function FinalizeForm({
+  pot,
+  decimals,
+  disabled = false,
+  error,
+  isPending = false,
+  onFinalize,
+}: FinalizeFormProps) {
   const [rows, setRows] = useState<DraftRow[]>([EMPTY_ROW]);
 
   const parsedRows = useMemo(() => rows.map((row) => parseDraftRow(row, decimals)), [decimals, rows]);
-  const total = parsedRows.reduce((sum, row) => sum + (row.amount ?? 0n), 0n);
+  const activeRows = useMemo(
+    () =>
+      rows
+        .map((row, index) => ({ draft: row, parsed: parsedRows[index] }))
+        .filter(({ draft }) => !isBlankRow(draft)),
+    [parsedRows, rows],
+  );
+  const total = activeRows.reduce((sum, row) => sum + (row.parsed.amount ?? 0n), 0n);
   const remaining = pot - total;
-  const rowsValid = parsedRows.every((row) => row.recipient && row.amount !== undefined);
-  const canFinalize = rowsValid && total === pot;
+  const rowsValid = activeRows.every((row) => row.parsed.recipient && row.parsed.amount !== undefined);
+  const formDisabled = disabled || isPending;
+  const canFinalize = !formDisabled && activeRows.length > 0 && rowsValid && total === pot;
 
   function updateRow(index: number, field: keyof DraftRow, value: string) {
     setRows((currentRows) =>
@@ -73,9 +95,9 @@ export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
     if (!canFinalize) return;
 
     onFinalize(
-      parsedRows.map((row) => ({
-        recipient: row.recipient!,
-        amount: row.amount!,
+      activeRows.map((row) => ({
+        recipient: row.parsed.recipient!,
+        amount: row.parsed.amount!,
       })),
     );
   }
@@ -91,10 +113,11 @@ export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
         {rows.map((row, index) => {
           const rowNumber = index + 1;
           const parsedRow = parsedRows[index];
+          const rowIsBlank = isBlankRow(row);
           const recipientErrorId = `finalize-recipient-error-${rowNumber}`;
           const amountErrorId = `finalize-amount-error-${rowNumber}`;
-          const showRecipientError = row.recipient.trim().length > 0 && parsedRow.recipientError;
-          const showAmountError = row.amount.trim().length > 0 && parsedRow.amountError;
+          const showRecipientError = !rowIsBlank && parsedRow.recipientError;
+          const showAmountError = !rowIsBlank && parsedRow.amountError;
 
           return (
             <div className="stack" key={rowNumber}>
@@ -104,6 +127,7 @@ export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
                   aria-label={`Recipient ${rowNumber}`}
                   aria-describedby={showRecipientError ? recipientErrorId : undefined}
                   aria-invalid={showRecipientError ? "true" : undefined}
+                  disabled={formDisabled}
                   value={row.recipient}
                   onChange={(event) => updateRow(index, "recipient", event.target.value)}
                 />
@@ -121,6 +145,7 @@ export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
                   aria-describedby={showAmountError ? amountErrorId : undefined}
                   aria-invalid={showAmountError ? "true" : undefined}
                   inputMode="decimal"
+                  disabled={formDisabled}
                   value={row.amount}
                   onChange={(event) => updateRow(index, "amount", event.target.value)}
                 />
@@ -132,7 +157,7 @@ export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
               ) : null}
 
               {rows.length > 1 ? (
-                <button className="secondary-button" type="button" onClick={() => removeRow(index)}>
+                <button className="secondary-button" type="button" disabled={formDisabled} onClick={() => removeRow(index)}>
                   Remove payout {rowNumber}
                 </button>
               ) : null}
@@ -141,18 +166,28 @@ export function FinalizeForm({ pot, decimals, onFinalize }: FinalizeFormProps) {
         })}
 
         <div className="button-row">
-          <button className="secondary-button" type="button" onClick={addRow}>
+          <button className="secondary-button" type="button" disabled={formDisabled} onClick={addRow}>
             Add payout
           </button>
           <button className="primary-button" type="submit" disabled={!canFinalize}>
-            Finalize payouts
+            {isPending ? "Finalizing payouts" : "Finalize payouts"}
           </button>
         </div>
 
+        {error ? (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        ) : null}
+
         {remaining < 0n ? (
-          <p className="error-text">Over by: {formatTokenAmount(-remaining, decimals)}</p>
+          <p className="error-text" role="alert">
+            Over by: {formatTokenAmount(-remaining, decimals)}
+          </p>
         ) : (
-          <p className="muted">Remaining: {formatTokenAmount(remaining, decimals)}</p>
+          <p className="muted" aria-live="polite">
+            Remaining: {formatTokenAmount(remaining, decimals)}
+          </p>
         )}
       </form>
     </section>
