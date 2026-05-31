@@ -1,3 +1,4 @@
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useMemo, useState } from "react";
 import { CreateGamePage } from "./pages/CreateGamePage";
 import { GamePage } from "./pages/GamePage";
@@ -12,6 +13,10 @@ export function App() {
 
   return (
     <main className="app-shell">
+      <header className="app-toolbar">
+        <span className="app-title">Web3 Poker Pot</span>
+        <ConnectButton />
+      </header>
       {routeGameId ? (
         <GamePage gameId={routeGameId} />
       ) : (

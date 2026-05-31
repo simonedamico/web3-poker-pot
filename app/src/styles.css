@@ -20,6 +20,19 @@ textarea {
   padding: 32px;
 }
 
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 920px;
+  margin: 0 auto 24px;
+  gap: 16px;
+}
+
+.app-title {
+  font-weight: 700;
+}
+
 .panel {
   max-width: 920px;
   margin: 0 auto;
@@ -66,6 +79,12 @@ textarea {
   color: #17202f;
   background: #fff;
   cursor: pointer;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .error-text {
