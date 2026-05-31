@@ -1,43 +1,65 @@
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { AddressListInput } from "../components/AddressListInput";
 import { TokenAmountInput } from "../components/TokenAmountInput";
 import { allowlistedTokens } from "../contracts/pokerPot";
 import { normalizeAddressList } from "../lib/address";
 import { parseTokenAmount } from "../lib/tokenAmount";
 
-type CreateGamePageProps = {
-  onCreated: (gameId: bigint) => void;
+const ERROR_ID = "create-game-error";
+const NO_TOKENS_MESSAGE = "No allowlisted tokens are configured. Run deployment setup before creating a game.";
+
+type ErrorField = "token" | "buyInAmount" | "whitelist";
+
+type SubmitError = {
+  field: ErrorField;
+  message: string;
 };
 
-export function CreateGamePage({ onCreated }: CreateGamePageProps) {
+type CreateGamePageProps = {
+  onCreated: (gameId: bigint) => void;
+  availableTokens?: `0x${string}`[];
+};
+
+export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens }: CreateGamePageProps) {
   const [token, setToken] = useState("");
   const [buyInAmount, setBuyInAmount] = useState("");
   const [whitelist, setWhitelist] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<SubmitError | null>(null);
+
+  const hasTokenOptions = availableTokens.length > 0;
+
+  function showError(field: ErrorField, message: string) {
+    setSubmitError({ field, message });
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setSubmitError(null);
+
+    if (!hasTokenOptions) {
+      return;
+    }
 
     try {
       parseTokenAmount(buyInAmount, 6);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Enter a valid token amount.");
+      const message = caughtError instanceof Error ? caughtError.message : "Enter a valid token amount.";
+      showError("buyInAmount", message);
       return;
     }
 
     const whitelistResult = normalizeAddressList(whitelist);
     if (whitelistResult.errors.length > 0) {
-      setError(whitelistResult.errors[0]);
+      showError("whitelist", whitelistResult.errors[0]);
       return;
     }
     if (whitelistResult.addresses.length === 0) {
-      setError("Add at least one whitelisted address.");
+      showError("whitelist", "Add at least one whitelisted address.");
       return;
     }
 
-    if (!token) {
-      setError("Select an allowlisted token.");
+    if (!token || !availableTokens.some((availableToken) => availableToken === token)) {
+      showError("token", "Select an allowlisted token.");
       return;
     }
 
@@ -50,19 +72,42 @@ export function CreateGamePage({ onCreated }: CreateGamePageProps) {
       <form className="stack" onSubmit={handleSubmit}>
         <label className="field">
           <span>Token</span>
-          <select aria-label="Token" value={token} onChange={(event) => setToken(event.target.value)}>
+          <select
+            aria-describedby={submitError?.field === "token" ? ERROR_ID : undefined}
+            aria-invalid={submitError?.field === "token" ? "true" : undefined}
+            aria-label="Token"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+          >
             <option value="">Select token</option>
-            {allowlistedTokens.map((allowlistedToken) => (
+            {availableTokens.map((allowlistedToken) => (
               <option key={allowlistedToken} value={allowlistedToken}>
                 {allowlistedToken}
               </option>
             ))}
           </select>
         </label>
-        <TokenAmountInput label="Buy-in amount" value={buyInAmount} onChange={setBuyInAmount} />
-        <AddressListInput label="Whitelist addresses" value={whitelist} onChange={setWhitelist} />
-        {error ? <p className="error-text">{error}</p> : null}
-        <button className="primary-button" type="submit">
+        {!hasTokenOptions ? <p className="error-text">{NO_TOKENS_MESSAGE}</p> : null}
+        <TokenAmountInput
+          describedBy={submitError?.field === "buyInAmount" ? ERROR_ID : undefined}
+          invalid={submitError?.field === "buyInAmount"}
+          label="Buy-in amount"
+          value={buyInAmount}
+          onChange={setBuyInAmount}
+        />
+        <AddressListInput
+          describedBy={submitError?.field === "whitelist" ? ERROR_ID : undefined}
+          invalid={submitError?.field === "whitelist"}
+          label="Whitelist addresses"
+          value={whitelist}
+          onChange={setWhitelist}
+        />
+        {submitError ? (
+          <p className="error-text" id={ERROR_ID} role="alert">
+            {submitError.message}
+          </p>
+        ) : null}
+        <button className="primary-button" type="submit" disabled={!hasTokenOptions}>
           Create game
         </button>
       </form>
