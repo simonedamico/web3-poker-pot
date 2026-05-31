@@ -1,0 +1,26 @@
+{
+  "name": "web3-poker-pot",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:contracts": "hardhat test",
+    "test:app": "npm --workspace app run test",
+    "build:app": "npm --workspace app run build",
+    "lint": "npm --workspace app run lint",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network testnet",
+    "export:abi": "hardhat run scripts/export-abi.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0"
+  }
+}
