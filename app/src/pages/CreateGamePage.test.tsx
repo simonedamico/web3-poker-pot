@@ -1,12 +1,28 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateGamePage } from "./CreateGamePage";
 
 const TOKEN = "0x0000000000000000000000000000000000000002" as const;
 const OTHER_TOKEN = "0x0000000000000000000000000000000000000003" as const;
 const WHITELIST_ADDRESS = "0x0000000000000000000000000000000000000001";
 
+const pokerPotWrites = vi.hoisted(() => ({
+  createGame: vi.fn(),
+  isPending: false,
+  error: null as string | null,
+}));
+
+vi.mock("../hooks/usePokerPot", () => ({
+  usePokerPotWrites: () => pokerPotWrites,
+}));
+
 describe("CreateGamePage", () => {
+  beforeEach(() => {
+    pokerPotWrites.createGame.mockReset();
+    pokerPotWrites.isPending = false;
+    pokerPotWrites.error = null;
+  });
+
   it("blocks creation when buy-in amount is invalid", () => {
     const onCreated = vi.fn();
     render(<CreateGamePage onCreated={onCreated} availableTokens={[TOKEN]} />);
@@ -20,6 +36,7 @@ describe("CreateGamePage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Amount must be greater than zero.");
     expect(screen.getByLabelText("Buy-in amount")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Buy-in amount")).toHaveAttribute("aria-describedby");
+    expect(pokerPotWrites.createGame).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
 
@@ -34,6 +51,7 @@ describe("CreateGamePage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Line 1 is not a valid EVM address.");
     expect(screen.getByLabelText("Whitelist addresses")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Whitelist addresses")).toHaveAttribute("aria-describedby");
+    expect(pokerPotWrites.createGame).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
 
@@ -57,6 +75,7 @@ describe("CreateGamePage", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Select an allowlisted token.");
     expect(screen.getByLabelText("Token")).toHaveAttribute("aria-invalid", "true");
+    expect(pokerPotWrites.createGame).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
 
@@ -71,10 +90,11 @@ describe("CreateGamePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create game" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent("Select an allowlisted token.");
+    expect(pokerPotWrites.createGame).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("creates a placeholder game after selecting an allowlisted token", () => {
+  it("creates a contract game with parsed amount and normalized whitelist", () => {
     const onCreated = vi.fn();
     render(<CreateGamePage onCreated={onCreated} availableTokens={[TOKEN]} />);
 
@@ -83,6 +103,17 @@ describe("CreateGamePage", () => {
     fireEvent.change(screen.getByLabelText("Whitelist addresses"), { target: { value: WHITELIST_ADDRESS } });
     fireEvent.click(screen.getByRole("button", { name: "Create game" }));
 
+    expect(pokerPotWrites.createGame).toHaveBeenCalledWith(TOKEN, 25_000_000n, [WHITELIST_ADDRESS]);
     expect(onCreated).toHaveBeenCalledWith(1n);
+  });
+
+  it("disables creation while the wallet write is pending and displays write errors", () => {
+    pokerPotWrites.isPending = true;
+    pokerPotWrites.error = "User rejected the transaction.";
+
+    render(<CreateGamePage onCreated={vi.fn()} availableTokens={[TOKEN]} />);
+
+    expect(screen.getByRole("button", { name: "Creating game" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("User rejected the transaction.");
   });
 });

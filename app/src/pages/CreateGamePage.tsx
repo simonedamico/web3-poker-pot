@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { AddressListInput } from "../components/AddressListInput";
 import { TokenAmountInput } from "../components/TokenAmountInput";
 import { allowlistedTokens } from "../contracts/pokerPot";
+import { usePokerPotWrites } from "../hooks/usePokerPot";
 import { normalizeAddressList } from "../lib/address";
 import { parseTokenAmount } from "../lib/tokenAmount";
 
@@ -25,8 +26,10 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
   const [buyInAmount, setBuyInAmount] = useState("");
   const [whitelist, setWhitelist] = useState("");
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
+  const pokerPot = usePokerPotWrites();
 
   const hasTokenOptions = availableTokens.length > 0;
+  const formDisabled = !hasTokenOptions || pokerPot.isPending;
 
   function showError(field: ErrorField, message: string) {
     setSubmitError({ field, message });
@@ -41,29 +44,29 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
     }
 
     try {
-      parseTokenAmount(buyInAmount, 6);
+      const parsedAmount = parseTokenAmount(buyInAmount, 6);
+      const whitelistResult = normalizeAddressList(whitelist);
+
+      if (whitelistResult.errors.length > 0) {
+        showError("whitelist", whitelistResult.errors[0]);
+        return;
+      }
+      if (whitelistResult.addresses.length === 0) {
+        showError("whitelist", "Add at least one whitelisted address.");
+        return;
+      }
+
+      if (!token || !availableTokens.some((availableToken) => availableToken === token)) {
+        showError("token", "Select an allowlisted token.");
+        return;
+      }
+
+      pokerPot.createGame(token as `0x${string}`, parsedAmount, whitelistResult.addresses);
+      onCreated(1n);
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Enter a valid token amount.";
       showError("buyInAmount", message);
-      return;
     }
-
-    const whitelistResult = normalizeAddressList(whitelist);
-    if (whitelistResult.errors.length > 0) {
-      showError("whitelist", whitelistResult.errors[0]);
-      return;
-    }
-    if (whitelistResult.addresses.length === 0) {
-      showError("whitelist", "Add at least one whitelisted address.");
-      return;
-    }
-
-    if (!token || !availableTokens.some((availableToken) => availableToken === token)) {
-      showError("token", "Select an allowlisted token.");
-      return;
-    }
-
-    onCreated(1n);
   }
 
   return (
@@ -107,8 +110,13 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
             {submitError.message}
           </p>
         ) : null}
-        <button className="primary-button" type="submit" disabled={!hasTokenOptions}>
-          Create game
+        {!submitError && pokerPot.error ? (
+          <p className="error-text" role="alert">
+            {pokerPot.error}
+          </p>
+        ) : null}
+        <button className="primary-button" type="submit" disabled={formDisabled}>
+          {pokerPot.isPending ? "Creating game" : "Create game"}
         </button>
       </form>
     </section>
