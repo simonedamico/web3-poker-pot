@@ -202,7 +202,7 @@ export function GamePage({ gameId }: GamePageProps) {
                     }
                   >
                     <UserMinus className="button-icon" size={17} aria-hidden="true" />
-                    Remove {labelAddress(account)}
+                    Remove
                   </button>
                 ) : null}
               </li>
