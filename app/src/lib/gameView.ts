@@ -1,6 +1,6 @@
-import { getAddress } from "viem";
+import { getAddress, isAddress } from "viem";
 
-type PermissionInput = {
+export type PermissionInput = {
   connected?: string;
   organiser: string;
   isOpen: boolean;
@@ -14,6 +14,12 @@ export type GamePermissions = {
   canFinalize: boolean;
 };
 
+const NO_PERMISSIONS: GamePermissions = {
+  canBuyIn: false,
+  canManageWhitelist: false,
+  canFinalize: false
+};
+
 function sameAddress(left?: string, right?: string): boolean {
   if (!left || !right) return false;
   return getAddress(left) === getAddress(right);
@@ -21,7 +27,11 @@ function sameAddress(left?: string, right?: string): boolean {
 
 export function deriveGamePermissions(input: PermissionInput): GamePermissions {
   if (!input.connected || !input.isOpen) {
-    return { canBuyIn: false, canManageWhitelist: false, canFinalize: false };
+    return NO_PERMISSIONS;
+  }
+
+  if (!isAddress(input.connected) || !isAddress(input.organiser)) {
+    return NO_PERMISSIONS;
   }
 
   const isOrganiser = sameAddress(input.connected, input.organiser);

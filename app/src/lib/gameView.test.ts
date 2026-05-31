@@ -21,4 +21,11 @@ describe("deriveGamePermissions", () => {
     expect(deriveGamePermissions({ connected: organiser, organiser, isOpen: false, isWhitelisted: true, totalPot: 1n }))
       .toEqual({ canBuyIn: false, canManageWhitelist: false, canFinalize: false });
   });
+
+  it("fails closed for malformed addresses", () => {
+    expect(deriveGamePermissions({ connected: "not-an-address", organiser, isOpen: true, isWhitelisted: true, totalPot: 1n }))
+      .toEqual({ canBuyIn: false, canManageWhitelist: false, canFinalize: false });
+    expect(deriveGamePermissions({ connected: organiser, organiser: "not-an-address", isOpen: true, isWhitelisted: true, totalPot: 1n }))
+      .toEqual({ canBuyIn: false, canManageWhitelist: false, canFinalize: false });
+  });
 });

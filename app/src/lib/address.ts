@@ -1,5 +1,7 @@
 import { getAddress, isAddress } from "viem";
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 export type AddressListResult = {
   addresses: `0x${string}`[];
   errors: string[];
@@ -20,6 +22,10 @@ export function normalizeAddressList(input: string): AddressListResult {
         return;
       }
       const checksum = getAddress(line);
+      if (checksum === ZERO_ADDRESS) {
+        errors.push(`Line ${index + 1} is the zero address.`);
+        return;
+      }
       const key = checksum.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);

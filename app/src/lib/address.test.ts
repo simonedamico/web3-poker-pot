@@ -24,4 +24,11 @@ describe("normalizeAddressList", () => {
     expect(result.addresses).toEqual([]);
     expect(result.errors).toEqual(["Line 1 is not a valid EVM address."]);
   });
+
+  it("rejects the zero address", () => {
+    const result = normalizeAddressList("0x0000000000000000000000000000000000000000");
+
+    expect(result.addresses).toEqual([]);
+    expect(result.errors).toEqual(["Line 1 is the zero address."]);
+  });
 });

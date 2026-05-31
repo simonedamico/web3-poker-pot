@@ -1,5 +1,7 @@
 import { formatUnits, parseUnits } from "viem";
 
+const TOKEN_AMOUNT_PATTERN = /^\d+(?:\.\d+)?$/;
+
 export type PayoutAmountRow = {
   amount: bigint;
 };
@@ -8,6 +10,7 @@ export function parseTokenAmount(value: string, decimals: number): bigint {
   const trimmed = value.trim();
   if (!trimmed) throw new Error("Enter a token amount.");
   if (trimmed.startsWith("-")) throw new Error("Amount must be greater than zero.");
+  if (!TOKEN_AMOUNT_PATTERN.test(trimmed)) throw new Error("Enter a valid token amount.");
 
   const [, fraction = ""] = trimmed.split(".");
   if (fraction.length > decimals) {
