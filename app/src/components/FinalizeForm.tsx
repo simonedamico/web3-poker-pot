@@ -1,3 +1,4 @@
+import { Plus, Trophy, UserMinus } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { type EnsNameResolver, parseAddressInput, resolveAddressInput } from "../lib/address";
 import { formatTokenAmount, parseTokenAmount } from "../lib/tokenAmount";
@@ -134,11 +135,12 @@ export function FinalizeForm({
   }
 
   return (
-    <section className="stack">
-      <div>
+    <section className="table-section finalize-section stack">
+      <div className="section-heading">
+        <Trophy size={19} aria-hidden="true" />
         <h2>Finalize payouts</h2>
-        <p className="muted">Pot: {formatTokenAmount(pot, decimals)}</p>
       </div>
+      <p className="pot-pill muted">Pot: {formatTokenAmount(pot, decimals)}</p>
 
       <form className="stack" onSubmit={handleSubmit}>
         {rows.map((row, index) => {
@@ -153,7 +155,7 @@ export function FinalizeForm({
           const showAmountError = !rowIsBlank && parsedRow.amountError;
 
           return (
-            <div className="stack" key={rowNumber}>
+            <div className="payout-row stack" key={rowNumber}>
               <label className="field">
                 <span>Recipient {rowNumber}</span>
                 <input
@@ -191,6 +193,7 @@ export function FinalizeForm({
 
               {rows.length > 1 ? (
                 <button className="secondary-button" type="button" disabled={formDisabled} onClick={() => removeRow(index)}>
+                  <UserMinus className="button-icon" size={17} aria-hidden="true" />
                   Remove payout {rowNumber}
                 </button>
               ) : null}
@@ -200,9 +203,11 @@ export function FinalizeForm({
 
         <div className="button-row">
           <button className="secondary-button" type="button" disabled={formDisabled} onClick={addRow}>
+            <Plus className="button-icon" size={17} aria-hidden="true" />
             Add payout
           </button>
           <button className="primary-button" type="submit" disabled={!canFinalize}>
+            <Trophy className="button-icon" size={18} aria-hidden="true" />
             {isPending ? "Finalizing payouts" : "Finalize payouts"}
           </button>
         </div>

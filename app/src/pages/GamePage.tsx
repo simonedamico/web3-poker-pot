@@ -1,3 +1,4 @@
+import { CircleDollarSign, ClipboardCopy, Crown, Trophy, UserMinus, UserPlus, Users, Wallet } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { getAddress, isAddress } from "viem";
 import { useAccount } from "wagmi";
@@ -114,36 +115,53 @@ export function GamePage({ gameId }: GamePageProps) {
   }
 
   return (
-    <section className="panel stack">
-      <div>
-        <h1>Game #{gameId.toString()}</h1>
-        <p className="muted">{game.isLoading ? "Loading game..." : "Poker pot contract state"}</p>
-        <div className="button-row">
+    <section className="panel game-panel stack">
+      <header className="game-hero">
+        <div className="table-heading">
+          <div className="dealer-button" aria-hidden="true">
+            <Crown size={24} strokeWidth={2.4} />
+          </div>
+          <div>
+            <p className="eyebrow">Poker table</p>
+            <h1>Game #{gameId.toString()}</h1>
+            <p className="muted">{game.isLoading ? "Loading game..." : "Poker pot contract state"}</p>
+          </div>
+        </div>
+        <div className="share-strip">
           <button className="secondary-button" type="button" onClick={copyGameLink}>
+            <ClipboardCopy className="button-icon" size={17} aria-hidden="true" />
             Copy game link
           </button>
           <span className="muted">{gameLink}</span>
         </div>
         {copyMessage ? <p className="muted">{copyMessage}</p> : null}
-      </div>
+      </header>
 
       {game.error ? <p className="error-text" role="alert">{game.error.message}</p> : null}
 
       {gameData ? (
-        <section className="stack">
-          <h2>Game details</h2>
-          <p>Organiser: {labelAddress(gameData[0])}</p>
-          <p>Token: {tokenSummaryLabel(gameData[1], activeTokenMetadata)}</p>
-          {activeTokenMetadata ? <p className="muted">Token address: {gameData[1]}</p> : null}
-          <p>Buy-in amount: {formatTokenAmount(gameData[2], TOKEN_DECIMALS)}</p>
-          <p>Status: {statusLabel(gameData[3])}</p>
-          <p>Total pot: {formatTokenAmount(gameData[4], TOKEN_DECIMALS)}</p>
+        <section className="table-section stack">
+          <div className="section-heading">
+            <CircleDollarSign size={19} aria-hidden="true" />
+            <h2>Game details</h2>
+          </div>
+          <div className="stat-grid">
+            <p className="stat-card">Organiser: {labelAddress(gameData[0])}</p>
+            <p className="stat-card">Token: {tokenSummaryLabel(gameData[1], activeTokenMetadata)}</p>
+            <p className="stat-card">Buy-in amount: {formatTokenAmount(gameData[2], TOKEN_DECIMALS)}</p>
+            <p className="stat-card">Status: {statusLabel(gameData[3])}</p>
+            <p className="stat-card stat-card-pot">Total pot: {formatTokenAmount(gameData[4], TOKEN_DECIMALS)}</p>
+          </div>
+          {activeTokenMetadata ? <p className="muted token-address">Token address: {gameData[1]}</p> : null}
         </section>
       ) : null}
 
       {permissions.canBuyIn ? (
-        <section className="stack">
-          <h2>Buy in</h2>
+        <section className="table-section buy-in-section stack">
+          <div className="section-heading">
+            <Wallet size={19} aria-hidden="true" />
+            <h2>Buy in</h2>
+          </div>
           {connectedBuyInCount.error ? (
             <p className="error-text" role="alert">
               {connectedBuyInCount.error.message}
@@ -151,25 +169,29 @@ export function GamePage({ gameId }: GamePageProps) {
           ) : connectedBuyInCount.isLoading ? (
             <p className="muted">Loading your buy-ins...</p>
           ) : connectedBuyInCountData !== undefined ? (
-            <p>Your buy-ins: {connectedBuyInCountData.toString()}</p>
+            <p className="buy-in-count">Your buy-ins: {connectedBuyInCountData.toString()}</p>
           ) : (
             <p className="muted">Your buy-ins unavailable.</p>
           )}
           <button className="primary-button" type="button" disabled={writes.isPending || !allowanceReady} onClick={handleBuyIn}>
+            <Wallet className="button-icon" size={18} aria-hidden="true" />
             {buyInButtonLabel}
           </button>
         </section>
       ) : null}
 
-      <section className="stack">
-        <h2>Whitelist</h2>
+      <section className="table-section stack">
+        <div className="section-heading">
+          <Users size={19} aria-hidden="true" />
+          <h2>Whitelist</h2>
+        </div>
         <p>Whitelisted addresses: {whitelistAddresses.length}</p>
         {whitelist.error ? <p className="error-text" role="alert">{whitelist.error.message}</p> : null}
         {whitelistAddresses.length > 0 ? (
-          <ul>
+          <ul className="seat-list">
             {whitelistAddresses.map((account) => (
-              <li key={account}>
-                {labelAddress(account)}
+              <li className="seat-row" key={account}>
+                <span>{labelAddress(account)}</span>
                 {permissions.canManageWhitelist ? (
                   <button
                     className="secondary-button"
@@ -179,6 +201,7 @@ export function GamePage({ gameId }: GamePageProps) {
                       void Promise.resolve(writes.setWhitelist(gameId, account, false)).catch(() => undefined)
                     }
                   >
+                    <UserMinus className="button-icon" size={17} aria-hidden="true" />
                     Remove {labelAddress(account)}
                   </button>
                 ) : null}
@@ -189,7 +212,7 @@ export function GamePage({ gameId }: GamePageProps) {
           <p className="muted">No whitelisted addresses loaded.</p>
         )}
         {permissions.canManageWhitelist ? (
-          <form className="button-row" onSubmit={handleWhitelistSubmit}>
+          <form className="button-row whitelist-form" onSubmit={handleWhitelistSubmit}>
             <label className="field">
               <span>Whitelist account</span>
               <input
@@ -199,6 +222,7 @@ export function GamePage({ gameId }: GamePageProps) {
               />
             </label>
             <button className="secondary-button" type="submit" disabled={writes.isPending}>
+              <UserPlus className="button-icon" size={17} aria-hidden="true" />
               Add to whitelist
             </button>
             {whitelistError ? <p className="error-text" role="alert">{whitelistError}</p> : null}
@@ -206,19 +230,22 @@ export function GamePage({ gameId }: GamePageProps) {
         ) : null}
       </section>
 
-      <section className="stack">
-        <h2>Participants</h2>
+      <section className="table-section stack">
+        <div className="section-heading">
+          <Users size={19} aria-hidden="true" />
+          <h2>Participants</h2>
+        </div>
         {participants.error ? <p className="error-text" role="alert">{participants.error.message}</p> : null}
         {participantBuyIns.error ? <p className="error-text" role="alert">{participantBuyIns.error.message}</p> : null}
         {participantAddresses.length > 0 && participantBuyIns.isLoading ? (
           <p className="muted">Loading participant buy-ins...</p>
         ) : participantAddresses.length > 0 && participantBuyIns.error ? null : participantAddresses.length > 0 ? (
-          <ul>
+          <ul className="seat-list">
             {participantAddresses.map((participant) => (
-              <li key={participant}>
+              <li className="seat-row" key={participant}>
                 <span>{labelAddress(participant)}</span>
                 {participantCounts?.find((row) => row && sameAddress(row.account, participant)) ? (
-                  <span>
+                  <span className="buy-in-badge">
                     Buy-ins:{" "}
                     {participantCounts.find((row) => row && sameAddress(row.account, participant))?.count.toString()}
                   </span>
@@ -241,11 +268,14 @@ export function GamePage({ gameId }: GamePageProps) {
             {payouts.error.message}
           </p>
         ) : payouts.data ? (
-          <section className="stack">
-            <h2>Final payouts</h2>
-            <ul>
+          <section className="table-section stack">
+            <div className="section-heading">
+              <Trophy size={19} aria-hidden="true" />
+              <h2>Final payouts</h2>
+            </div>
+            <ul className="seat-list">
               {(payouts.data as readonly [`0x${string}`[], bigint[]])[0].map((recipient, index) => (
-                <li key={`${recipient}-${index}`}>
+                <li className="seat-row" key={`${recipient}-${index}`}>
                   {labelAddress(recipient)}:{" "}
                   {formatTokenAmount(
                     (payouts.data as readonly [`0x${string}`[], bigint[]])[1][index] ?? 0n,

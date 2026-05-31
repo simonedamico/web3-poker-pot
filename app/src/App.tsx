@@ -1,4 +1,5 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Heart, Spade } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { HardhatGasButton } from "./components/HardhatGasButton";
 import { LocalTokenMintButton } from "./components/LocalTokenMintButton";
@@ -33,8 +34,14 @@ export function App() {
       <header className="app-toolbar">
         <div className="brand-lockup">
           <div className="brand-mark" aria-hidden="true">
-            <span>A</span>
-            <span>K</span>
+            <span className="brand-card brand-card-spade">
+              <span>A</span>
+              <Spade size={14} strokeWidth={2.7} />
+            </span>
+            <span className="brand-card brand-card-heart">
+              <span>K</span>
+              <Heart size={14} strokeWidth={2.7} />
+            </span>
           </div>
           <div className="brand-copy">
             <span className="app-title">Poker Pot Table</span>

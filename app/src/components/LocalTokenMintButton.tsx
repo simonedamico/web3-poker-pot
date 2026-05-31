@@ -1,3 +1,4 @@
+import { Coins } from "lucide-react";
 import { useState } from "react";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 import { localChainId, localMockToken } from "../contracts/pokerPot";
@@ -69,6 +70,7 @@ export function LocalTokenMintButton() {
   return (
     <div className="token-faucet">
       <button className="secondary-button chip-button" type="button" disabled={disabled} onClick={handleClick}>
+        <Coins className="button-icon" size={17} aria-hidden="true" />
         {label}
       </button>
       {status === "success" ? <span className="faucet-status">Tokens loaded</span> : null}

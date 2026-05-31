@@ -1,3 +1,4 @@
+import { CircleDollarSign, Dices, Plus, Users } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { AddressListInput } from "../components/AddressListInput";
 import { TokenAmountInput } from "../components/TokenAmountInput";
@@ -104,13 +105,18 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
   }
 
   return (
-    <section className="panel stack">
-      <header className="panel-heading">
-        <p className="eyebrow">Game setup</p>
-        <h1>Open a poker table</h1>
-        <p className="muted">Set the stakes, invite the seats, and choose the token for tonight's pot.</p>
+    <section className="panel setup-panel stack">
+      <header className="panel-heading table-heading">
+        <div className="dealer-button" aria-hidden="true">
+          <Dices size={24} strokeWidth={2.4} />
+        </div>
+        <div>
+          <p className="eyebrow">Game setup</p>
+          <h1>Open a poker table</h1>
+          <p className="muted">Set the stakes, invite the seats, and choose the token for tonight's pot.</p>
+        </div>
       </header>
-      <form className="stack" onSubmit={handleSubmit}>
+      <form className="stack setup-form" onSubmit={handleSubmit}>
         {showLocalTestHelper ? (
           <section className="local-test-panel">
             <div>
@@ -118,45 +124,59 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
               <p className="muted">Token, stakes, and three seats ready for a local table.</p>
             </div>
             <button className="secondary-button" type="button" onClick={fillLocalTestTable}>
+              <Dices className="button-icon" size={17} aria-hidden="true" />
               Fill local test table
             </button>
           </section>
         ) : null}
-        <label className="field">
-          <span>Token</span>
-          <select
-            aria-describedby={submitError?.field === "token" ? ERROR_ID : undefined}
-            aria-invalid={submitError?.field === "token" ? "true" : undefined}
-            aria-label="Token"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          >
-            <option value="">Select token</option>
-            {availableTokens.map((allowlistedToken) => (
-              <option key={allowlistedToken} value={allowlistedToken}>
-                {tokenDisplayLabel(
-                  allowlistedToken,
-                  tokenMetadata.metadataByAddress[tokenMetadataKey(allowlistedToken)],
-                )}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="form-grid">
+          <label className="field field-card">
+            <span>
+              <CircleDollarSign className="field-icon" size={17} aria-hidden="true" />
+              Token
+            </span>
+            <select
+              aria-describedby={submitError?.field === "token" ? ERROR_ID : undefined}
+              aria-invalid={submitError?.field === "token" ? "true" : undefined}
+              aria-label="Token"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+            >
+              <option value="">Select token</option>
+              {availableTokens.map((allowlistedToken) => (
+                <option key={allowlistedToken} value={allowlistedToken}>
+                  {tokenDisplayLabel(
+                    allowlistedToken,
+                    tokenMetadata.metadataByAddress[tokenMetadataKey(allowlistedToken)],
+                  )}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="field-card">
+            <TokenAmountInput
+              describedBy={submitError?.field === "buyInAmount" ? ERROR_ID : undefined}
+              invalid={submitError?.field === "buyInAmount"}
+              label="Buy-in amount"
+              value={buyInAmount}
+              onChange={setBuyInAmount}
+            />
+          </div>
+        </div>
         {!hasTokenOptions ? <p className="error-text">{NO_TOKENS_MESSAGE}</p> : null}
-        <TokenAmountInput
-          describedBy={submitError?.field === "buyInAmount" ? ERROR_ID : undefined}
-          invalid={submitError?.field === "buyInAmount"}
-          label="Buy-in amount"
-          value={buyInAmount}
-          onChange={setBuyInAmount}
-        />
-        <AddressListInput
-          describedBy={submitError?.field === "whitelist" ? ERROR_ID : undefined}
-          invalid={submitError?.field === "whitelist"}
-          label="Whitelist addresses"
-          value={whitelist}
-          onChange={setWhitelist}
-        />
+        <div className="field-card">
+          <div className="field-card-heading">
+            <Users size={18} aria-hidden="true" />
+            <span>Invited seats</span>
+          </div>
+          <AddressListInput
+            describedBy={submitError?.field === "whitelist" ? ERROR_ID : undefined}
+            invalid={submitError?.field === "whitelist"}
+            label="Whitelist addresses"
+            value={whitelist}
+            onChange={setWhitelist}
+          />
+        </div>
         {submitError ? (
           <p className="error-text" id={ERROR_ID} role="alert">
             {submitError.message}
@@ -168,6 +188,7 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
           </p>
         ) : null}
         <button className="primary-button" type="submit" disabled={formDisabled}>
+          <Plus className="button-icon" size={18} aria-hidden="true" />
           {pokerPot.isPending || isCreating ? "Creating game" : "Create game"}
         </button>
       </form>

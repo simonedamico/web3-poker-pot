@@ -1,3 +1,4 @@
+import { Fuel } from "lucide-react";
 import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { localChainId } from "../contracts/pokerPot";
@@ -50,6 +51,7 @@ export function HardhatGasButton() {
   return (
     <div className="gas-faucet">
       <button className="secondary-button chip-button" type="button" disabled={disabled} onClick={handleClick}>
+        <Fuel className="button-icon" size={17} aria-hidden="true" />
         {label}
       </button>
       {status === "success" ? <span className="faucet-status">Gas loaded</span> : null}
