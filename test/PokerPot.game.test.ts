@@ -94,4 +94,104 @@ describe("PokerPot game management", function () {
     expect(await pokerPot.isWhitelisted(1, playerA.address)).to.equal(false);
     expect(await pokerPot.getWhitelist(1)).to.deep.equal([playerB.address]);
   });
+
+  it("rejects zero-address entries during game creation", async function () {
+    const { pokerPot, organiser, token } = await deployFixture();
+
+    await expect(
+      pokerPot
+        .connect(organiser)
+        .createGame(token.address, 1n, [ethers.ZeroAddress])
+    ).to.be.revertedWithCustomError(pokerPot, "InvalidAddress");
+  });
+
+  it("rejects zero-address whitelist updates", async function () {
+    const { pokerPot, organiser, playerA, token } = await deployFixture();
+    await pokerPot
+      .connect(organiser)
+      .createGame(token.address, 1n, [playerA.address]);
+
+    await expect(
+      pokerPot.connect(organiser).setWhitelist(1, ethers.ZeroAddress, true)
+    ).to.be.revertedWithCustomError(pokerPot, "InvalidAddress");
+  });
+
+  it("deduplicates repeated initial whitelist entries", async function () {
+    const { pokerPot, organiser, playerA, playerB, token } =
+      await deployFixture();
+
+    await pokerPot.connect(organiser).createGame(token.address, 1n, [
+      playerA.address,
+      playerB.address,
+      playerA.address,
+      playerB.address,
+    ]);
+
+    expect(await pokerPot.getWhitelist(1)).to.deep.equal([
+      playerA.address,
+      playerB.address,
+    ]);
+  });
+
+  it("keeps whitelist stable for duplicate adds and non-member removals", async function () {
+    const { pokerPot, organiser, playerA, playerB, outsider, token } =
+      await deployFixture();
+    await pokerPot
+      .connect(organiser)
+      .createGame(token.address, 1n, [playerA.address]);
+
+    await pokerPot.connect(organiser).setWhitelist(1, playerB.address, true);
+    await pokerPot.connect(organiser).setWhitelist(1, playerB.address, true);
+
+    expect(await pokerPot.getWhitelist(1)).to.deep.equal([
+      playerA.address,
+      playerB.address,
+    ]);
+
+    await pokerPot.connect(organiser).setWhitelist(1, outsider.address, false);
+
+    expect(await pokerPot.getWhitelist(1)).to.deep.equal([
+      playerA.address,
+      playerB.address,
+    ]);
+  });
+
+  it("rejects missing game IDs", async function () {
+    const { pokerPot, organiser, playerA } = await deployFixture();
+
+    await expect(pokerPot.getGame(999)).to.be.revertedWithCustomError(
+      pokerPot,
+      "GameNotFound"
+    );
+    await expect(pokerPot.getWhitelist(999)).to.be.revertedWithCustomError(
+      pokerPot,
+      "GameNotFound"
+    );
+    await expect(
+      pokerPot.connect(organiser).setWhitelist(999, playerA.address, true)
+    ).to.be.revertedWithCustomError(pokerPot, "GameNotFound");
+  });
+
+  it("repairs whitelist indexes after removing a middle member", async function () {
+    const { pokerPot, organiser, playerA, playerB, outsider, token } =
+      await deployFixture();
+    await pokerPot.connect(organiser).createGame(token.address, 1n, [
+      playerA.address,
+      playerB.address,
+      outsider.address,
+    ]);
+
+    await pokerPot.connect(organiser).setWhitelist(1, playerB.address, false);
+
+    expect(await pokerPot.getWhitelist(1)).to.deep.equal([
+      playerA.address,
+      outsider.address,
+    ]);
+    expect(await pokerPot.isWhitelisted(1, playerB.address)).to.equal(false);
+
+    await pokerPot.connect(organiser).setWhitelist(1, outsider.address, false);
+
+    expect(await pokerPot.getWhitelist(1)).to.deep.equal([playerA.address]);
+    expect(await pokerPot.isWhitelisted(1, outsider.address)).to.equal(false);
+  });
 });
