@@ -2,8 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract PokerPot is Ownable {
+contract PokerPot is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     enum GameStatus {
         Open,
         Finalized
@@ -29,6 +34,8 @@ contract PokerPot is Ownable {
     error GameNotFound();
     error OnlyOrganiser();
     error GameClosed();
+    error NotWhitelisted();
+    error InvalidBuyInCount();
 
     uint256 public nextGameId = 1;
 
@@ -36,10 +43,13 @@ contract PokerPot is Ownable {
     mapping(uint256 => Game) private games;
     mapping(uint256 => mapping(address => bool)) public isWhitelisted;
     mapping(uint256 => mapping(address => uint256)) private whitelistIndexPlusOne;
+    mapping(uint256 => mapping(address => uint256)) public buyInCount;
+    mapping(uint256 => mapping(address => bool)) private hasParticipated;
 
     event TokenAllowlistUpdated(address indexed token, bool allowed);
     event GameCreated(uint256 indexed gameId, address indexed organiser, address indexed token, uint256 buyInAmount);
     event WhitelistUpdated(uint256 indexed gameId, address indexed account, bool allowed);
+    event BuyIn(uint256 indexed gameId, address indexed participant, uint256 count, uint256 amount);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -94,6 +104,30 @@ contract PokerPot is Ownable {
 
     function getWhitelist(uint256 gameId) external view returns (address[] memory) {
         return _requireGame(gameId).whitelist;
+    }
+
+    function buyIn(uint256 gameId, uint256 count) external nonReentrant {
+        Game storage game = _requireGame(gameId);
+        if (game.status != GameStatus.Open) revert GameClosed();
+        if (count == 0) revert InvalidBuyInCount();
+        if (!isWhitelisted[gameId][msg.sender]) revert NotWhitelisted();
+
+        uint256 amount = game.buyInAmount * count;
+        IERC20(game.token).safeTransferFrom(msg.sender, address(this), amount);
+
+        buyInCount[gameId][msg.sender] += count;
+        game.totalPot += amount;
+
+        if (!hasParticipated[gameId][msg.sender]) {
+            hasParticipated[gameId][msg.sender] = true;
+            game.participants.push(msg.sender);
+        }
+
+        emit BuyIn(gameId, msg.sender, count, amount);
+    }
+
+    function getParticipants(uint256 gameId) external view returns (address[] memory) {
+        return _requireGame(gameId).participants;
     }
 
     function _setWhitelist(uint256 gameId, address account, bool allowed) private {
