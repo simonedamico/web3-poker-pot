@@ -1,3 +1,12 @@
 .superpowers/
 .worktrees
 .worktrees/
+node_modules/
+app/node_modules/
+cache/
+artifacts/
+coverage/
+app/dist/
+.env
+*.tsbuildinfo
+*.log
