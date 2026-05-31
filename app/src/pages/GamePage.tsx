@@ -34,6 +34,7 @@ export function GamePage({ gameId }: GamePageProps) {
   const whitelistAddresses = (whitelist.data ?? []) as `0x${string}`[];
   const participantAddresses = (participants.data ?? []) as `0x${string}`[];
   const participantCounts = participantBuyIns.data;
+  const connectedBuyInCountData = connectedBuyInCount.data as bigint | undefined;
   const isOpen = gameData ? gameData[3] === 0 : false;
   const isConnectedWhitelisted = whitelistAddresses.some((account) => sameAddress(account, connected));
   const allowanceAmount = allowance.data as bigint | undefined;
@@ -104,7 +105,17 @@ export function GamePage({ gameId }: GamePageProps) {
       {permissions.canBuyIn ? (
         <section className="stack">
           <h2>Buy in</h2>
-          <p>Your buy-ins: {((connectedBuyInCount.data as bigint | undefined) ?? 0n).toString()}</p>
+          {connectedBuyInCount.error ? (
+            <p className="error-text" role="alert">
+              {connectedBuyInCount.error.message}
+            </p>
+          ) : connectedBuyInCount.isLoading ? (
+            <p className="muted">Loading your buy-ins...</p>
+          ) : connectedBuyInCountData !== undefined ? (
+            <p>Your buy-ins: {connectedBuyInCountData.toString()}</p>
+          ) : (
+            <p className="muted">Your buy-ins unavailable.</p>
+          )}
           <button className="primary-button" type="button" disabled={writes.isPending || !allowanceReady} onClick={handleBuyIn}>
             {buyInButtonLabel}
           </button>

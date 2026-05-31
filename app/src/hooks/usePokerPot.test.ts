@@ -101,6 +101,30 @@ describe("usePokerPot", () => {
     expect((caughtError as Error).message).toBe("GameCreated event was not found in the transaction receipt.");
   });
 
+  it("throws and exposes an error when a mined receipt reverted", async () => {
+    mocks.writeContractAsync.mockResolvedValue("0xabc");
+    mocks.waitForTransactionReceipt.mockResolvedValue({ logs: [], status: "reverted" });
+
+    const { result } = renderHook(() => usePokerPotWrites());
+
+    let caughtError: unknown;
+    await act(async () => {
+      try {
+        await result.current.createGame("0x0000000000000000000000000000000000000002", 25_000_000n, [
+          "0x0000000000000000000000000000000000000001",
+        ]);
+      } catch (error) {
+        caughtError = error;
+      }
+    });
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe("Transaction reverted.");
+    expect(result.current.error).toBe("Transaction reverted.");
+    expect(mocks.parseEventLogs).not.toHaveBeenCalled();
+    expect(mocks.invalidateQueries).not.toHaveBeenCalled();
+  });
+
   it("omits connected buy-in count args when no wallet is connected", () => {
     renderHook(() => usePokerPotGame(7n));
 

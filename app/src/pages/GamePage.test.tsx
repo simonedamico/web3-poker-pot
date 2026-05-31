@@ -158,6 +158,26 @@ describe("GamePage", () => {
     expect(hookState.writes.approve).not.toHaveBeenCalled();
   });
 
+  it("does not render missing connected buy-in count as zero while loading", () => {
+    hookState.connectedBuyInCount.data = undefined;
+    hookState.connectedBuyInCount.isLoading = true;
+
+    render(<GamePage gameId={1n} />);
+
+    expect(screen.getByText("Loading your buy-ins...")).toBeInTheDocument();
+    expect(screen.queryByText("Your buy-ins: 0")).not.toBeInTheDocument();
+  });
+
+  it("surfaces connected buy-in count read errors", () => {
+    hookState.connectedBuyInCount.data = undefined;
+    hookState.connectedBuyInCount.error = new Error("Connected count read failed.");
+
+    render(<GamePage gameId={1n} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Connected count read failed.");
+    expect(screen.queryByText("Your buy-ins: 0")).not.toBeInTheDocument();
+  });
+
   it("hides restricted controls from non-whitelisted non-organiser users", () => {
     hookState.account = addresses.other;
     hookState.whitelist.data = [addresses.participant];

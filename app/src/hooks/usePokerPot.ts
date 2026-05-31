@@ -154,6 +154,9 @@ export function usePokerPotWrites() {
     setMiningCount((count) => count + 1);
     try {
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status === "reverted") {
+        throw new Error("Transaction reverted.");
+      }
       await queryClient.invalidateQueries();
       return receipt;
     } catch (caughtError) {
