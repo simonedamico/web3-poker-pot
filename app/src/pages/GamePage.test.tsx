@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GamePage } from "./GamePage";
 
@@ -48,6 +48,10 @@ const hookState = vi.hoisted(() => ({
 const tokenMetadataState = vi.hoisted(() => ({
   metadataByAddress: {} as Record<string, { address: `0x${string}`; name?: string; symbol?: string }>,
 }));
+const ensState = vi.hoisted(() => ({
+  reverseNames: {} as Record<string, string>,
+  resolveEnsName: vi.fn(),
+}));
 
 vi.mock("wagmi", () => ({
   useAccount: () => ({ address: hookState.account }),
@@ -77,6 +81,13 @@ vi.mock("../hooks/useTokenMetadata", () => ({
   tokenMetadataKey: (address: `0x${string}`) => address.toLowerCase(),
 }));
 
+vi.mock("../hooks/useEnsNames", () => ({
+  addressDisplayLabel: (address: `0x${string}`, ensName?: string) => (ensName ? `${address} (${ensName})` : address),
+  ensAddressKey: (address: `0x${string}`) => address.toLowerCase(),
+  useEnsNameResolver: () => ensState.resolveEnsName,
+  useEnsReverseNames: () => ensState.reverseNames,
+}));
+
 describe("GamePage", () => {
   beforeEach(() => {
     hookState.account = addresses.participant;
@@ -102,6 +113,9 @@ describe("GamePage", () => {
     hookState.writes.isPending = false;
     hookState.writes.error = null;
     tokenMetadataState.metadataByAddress = {};
+    ensState.reverseNames = {};
+    ensState.resolveEnsName.mockReset();
+    ensState.resolveEnsName.mockResolvedValue(null);
   });
 
   it("renders live game metadata, whitelist, participants, and buy-in counts", () => {
@@ -128,6 +142,33 @@ describe("GamePage", () => {
 
     expect(screen.getByText("Token: Poker USD (PUSD)")).toBeInTheDocument();
     expect(screen.getByText(`Token address: ${addresses.token}`)).toBeInTheDocument();
+  });
+
+  it("shows reverse ENS names beside known addresses", () => {
+    ensState.reverseNames = {
+      [addresses.organiser.toLowerCase()]: "dealer.eth",
+      [addresses.participant.toLowerCase()]: "player.eth",
+    };
+
+    render(<GamePage gameId={1n} />);
+
+    expect(screen.getByText(`Organiser: ${addresses.organiser} (dealer.eth)`)).toBeInTheDocument();
+    expect(screen.getAllByText(`${addresses.participant} (player.eth)`).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("copies a shareable game link", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    window.history.pushState({}, "", "/game/1");
+    render(<GamePage gameId={1n} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy game link" }));
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/game/1`);
+    expect(await screen.findByText("Game link copied")).toBeInTheDocument();
   });
 
   it("does not render missing participant buy-in counts as zero", () => {
@@ -216,7 +257,7 @@ describe("GamePage", () => {
     expect(screen.queryByRole("button", { name: "Finalize payouts" })).not.toBeInTheDocument();
   });
 
-  it("lets the organiser update whitelist entries and finalize parsed payout rows", () => {
+  it("lets the organiser update whitelist entries and finalize parsed payout rows", async () => {
     hookState.account = addresses.organiser;
 
     render(<GamePage gameId={1n} />);
@@ -228,9 +269,22 @@ describe("GamePage", () => {
     fireEvent.change(screen.getByLabelText("Amount 1"), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: "Finalize payouts" }));
 
-    expect(hookState.writes.setWhitelist).toHaveBeenCalledWith(1n, addresses.other, true);
+    await waitFor(() => expect(hookState.writes.setWhitelist).toHaveBeenCalledWith(1n, addresses.other, true));
     expect(hookState.writes.setWhitelist).toHaveBeenCalledWith(1n, addresses.participant, false);
     expect(hookState.writes.finalize).toHaveBeenCalledWith(1n, [addresses.participant], [50_000_000n]);
+  });
+
+  it("resolves ENS names before adding whitelist accounts", async () => {
+    hookState.account = addresses.organiser;
+    ensState.resolveEnsName.mockResolvedValue(addresses.other);
+
+    render(<GamePage gameId={1n} />);
+
+    fireEvent.change(screen.getByLabelText("Whitelist account"), { target: { value: "guest.eth" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add to whitelist" }));
+
+    expect(ensState.resolveEnsName).toHaveBeenCalledWith("guest.eth");
+    await waitFor(() => expect(hookState.writes.setWhitelist).toHaveBeenCalledWith(1n, addresses.other, true));
   });
 
   it("renders final payouts only after the game is finalized", () => {

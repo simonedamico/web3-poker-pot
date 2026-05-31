@@ -15,6 +15,9 @@ const pokerPotWrites = vi.hoisted(() => ({
 const tokenMetadataState = vi.hoisted(() => ({
   metadataByAddress: {} as Record<string, { address: `0x${string}`; name?: string; symbol?: string }>,
 }));
+const ensState = vi.hoisted(() => ({
+  resolveEnsName: vi.fn(),
+}));
 
 vi.mock("../hooks/usePokerPot", () => ({
   usePokerPotWrites: () => pokerPotWrites,
@@ -31,12 +34,18 @@ vi.mock("../hooks/useTokenMetadata", () => ({
   tokenMetadataKey: (address: `0x${string}`) => address.toLowerCase(),
 }));
 
+vi.mock("../hooks/useEnsNames", () => ({
+  useEnsNameResolver: () => ensState.resolveEnsName,
+}));
+
 describe("CreateGamePage", () => {
   beforeEach(() => {
     pokerPotWrites.createGame.mockReset();
     pokerPotWrites.isPending = false;
     pokerPotWrites.error = null;
     tokenMetadataState.metadataByAddress = {};
+    ensState.resolveEnsName.mockReset();
+    ensState.resolveEnsName.mockResolvedValue(null);
   });
 
   it("blocks creation when buy-in amount is invalid", () => {
@@ -56,15 +65,16 @@ describe("CreateGamePage", () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("blocks creation when whitelist contains invalid addresses", () => {
+  it("blocks creation when whitelist contains invalid addresses", async () => {
     const onCreated = vi.fn();
     render(<CreateGamePage onCreated={onCreated} availableTokens={[TOKEN]} />);
 
+    fireEvent.change(screen.getByLabelText("Token"), { target: { value: TOKEN } });
     fireEvent.change(screen.getByLabelText("Buy-in amount"), { target: { value: "25" } });
     fireEvent.change(screen.getByLabelText("Whitelist addresses"), { target: { value: "bad-address" } });
     fireEvent.click(screen.getByRole("button", { name: "Create game" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Line 1 is not a valid EVM address.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Line 1 is not a valid EVM address or ENS name.");
     expect(screen.getByLabelText("Whitelist addresses")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Whitelist addresses")).toHaveAttribute("aria-describedby");
     expect(pokerPotWrites.createGame).not.toHaveBeenCalled();
@@ -141,9 +151,35 @@ describe("CreateGamePage", () => {
     fireEvent.change(screen.getByLabelText("Whitelist addresses"), { target: { value: WHITELIST_ADDRESS } });
     fireEvent.click(screen.getByRole("button", { name: "Create game" }));
 
-    expect(pokerPotWrites.createGame).toHaveBeenCalledWith(TOKEN, 25_000_000n, [WHITELIST_ADDRESS]);
-    expect(onCreated).not.toHaveBeenCalled();
+    await waitFor(() => expect(pokerPotWrites.createGame).toHaveBeenCalledWith(TOKEN, 25_000_000n, [WHITELIST_ADDRESS]));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(42n));
+  });
+
+  it("resolves ENS names in the whitelist before creating a game", async () => {
+    const onCreated = vi.fn();
+    ensState.resolveEnsName.mockResolvedValue(WHITELIST_ADDRESS);
+    pokerPotWrites.createGame.mockResolvedValue(42n);
+    render(<CreateGamePage onCreated={onCreated} availableTokens={[TOKEN]} />);
+
+    fireEvent.change(screen.getByLabelText("Token"), { target: { value: TOKEN } });
+    fireEvent.change(screen.getByLabelText("Buy-in amount"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Whitelist addresses"), { target: { value: "alice.eth" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create game" }));
+
+    expect(ensState.resolveEnsName).toHaveBeenCalledWith("alice.eth");
+    await waitFor(() => expect(pokerPotWrites.createGame).toHaveBeenCalledWith(TOKEN, 25_000_000n, [WHITELIST_ADDRESS]));
+  });
+
+  it("blocks creation when a whitelist ENS name cannot be resolved", async () => {
+    render(<CreateGamePage onCreated={vi.fn()} availableTokens={[TOKEN]} />);
+
+    fireEvent.change(screen.getByLabelText("Token"), { target: { value: TOKEN } });
+    fireEvent.change(screen.getByLabelText("Buy-in amount"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Whitelist addresses"), { target: { value: "missing.eth" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create game" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Line 1 ENS name could not be resolved.");
+    expect(pokerPotWrites.createGame).not.toHaveBeenCalled();
   });
 
   it("keeps the user on the create page and shows create errors", async () => {

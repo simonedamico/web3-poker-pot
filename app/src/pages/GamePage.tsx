@@ -2,9 +2,10 @@ import { type FormEvent, useState } from "react";
 import { getAddress, isAddress } from "viem";
 import { useAccount } from "wagmi";
 import { FinalizeForm } from "../components/FinalizeForm";
+import { addressDisplayLabel, ensAddressKey, useEnsNameResolver, useEnsReverseNames } from "../hooks/useEnsNames";
 import { type GameData, usePokerPotGame, usePokerPotWrites } from "../hooks/usePokerPot";
 import { tokenMetadataKey, tokenSummaryLabel, useTokenMetadata } from "../hooks/useTokenMetadata";
-import { normalizeAddressList } from "../lib/address";
+import { resolveAddressInput } from "../lib/address";
 import { deriveGamePermissions } from "../lib/gameView";
 import { formatTokenAmount } from "../lib/tokenAmount";
 
@@ -26,6 +27,7 @@ function statusLabel(status?: number): string {
 export function GamePage({ gameId }: GamePageProps) {
   const [whitelistAccount, setWhitelistAccount] = useState("");
   const [whitelistError, setWhitelistError] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const { address: connected } = useAccount();
   const { game, whitelist, participants, participantBuyIns, connectedBuyInCount, allowance, payouts } =
     usePokerPotGame(gameId);
@@ -37,6 +39,10 @@ export function GamePage({ gameId }: GamePageProps) {
   const activeTokenMetadata = activeToken ? tokenMetadata.metadataByAddress[tokenMetadataKey(activeToken)] : undefined;
   const whitelistAddresses = (whitelist.data ?? []) as `0x${string}`[];
   const participantAddresses = (participants.data ?? []) as `0x${string}`[];
+  const payoutData = payouts.data as readonly [`0x${string}`[], bigint[]] | undefined;
+  const payoutRecipients = payoutData?.[0] ?? [];
+  const ensNames = useEnsReverseNames([gameData?.[0], ...whitelistAddresses, ...participantAddresses, ...payoutRecipients]);
+  const resolveEnsName = useEnsNameResolver();
   const participantCounts = participantBuyIns.data;
   const connectedBuyInCountData = connectedBuyInCount.data as bigint | undefined;
   const isOpen = gameData ? gameData[3] === 0 : false;
@@ -58,23 +64,44 @@ export function GamePage({ gameId }: GamePageProps) {
         totalPot: gameData[4],
       })
     : { canBuyIn: false, canManageWhitelist: false, canFinalize: false };
+  const gameLink = `${window.location.origin}/game/${gameId.toString()}`;
 
-  function handleWhitelistSubmit(event: FormEvent<HTMLFormElement>) {
+  function labelAddress(address: `0x${string}`): string {
+    return addressDisplayLabel(address, ensNames[ensAddressKey(address)]);
+  }
+
+  async function handleWhitelistSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setWhitelistError(null);
-    const result = normalizeAddressList(whitelistAccount);
-
-    if (result.errors.length > 0) {
-      setWhitelistError(result.errors[0]);
-      return;
-    }
-    if (result.addresses.length === 0) {
+    if (!whitelistAccount.trim()) {
       setWhitelistError("Enter a whitelist address.");
       return;
     }
 
-    void Promise.resolve(writes.setWhitelist(gameId, result.addresses[0], true)).catch(() => undefined);
+    const result = await resolveAddressInput(whitelistAccount, resolveEnsName);
+
+    if (result.error || !result.address) {
+      const message =
+        result.error === "zero"
+          ? "Whitelist account cannot be the zero address."
+          : result.error === "ens-unresolved"
+            ? "ENS name could not be resolved."
+            : "Enter a valid whitelist address or ENS name.";
+      setWhitelistError(message);
+      return;
+    }
+
+    void Promise.resolve(writes.setWhitelist(gameId, result.address, true)).catch(() => undefined);
     setWhitelistAccount("");
+  }
+
+  async function copyGameLink() {
+    try {
+      await navigator.clipboard.writeText(gameLink);
+      setCopyMessage("Game link copied");
+    } catch {
+      setCopyMessage("Could not copy game link.");
+    }
   }
 
   function handleBuyIn() {
@@ -91,6 +118,13 @@ export function GamePage({ gameId }: GamePageProps) {
       <div>
         <h1>Game #{gameId.toString()}</h1>
         <p className="muted">{game.isLoading ? "Loading game..." : "Poker pot contract state"}</p>
+        <div className="button-row">
+          <button className="secondary-button" type="button" onClick={copyGameLink}>
+            Copy game link
+          </button>
+          <span className="muted">{gameLink}</span>
+        </div>
+        {copyMessage ? <p className="muted">{copyMessage}</p> : null}
       </div>
 
       {game.error ? <p className="error-text" role="alert">{game.error.message}</p> : null}
@@ -98,7 +132,7 @@ export function GamePage({ gameId }: GamePageProps) {
       {gameData ? (
         <section className="stack">
           <h2>Game details</h2>
-          <p>Organiser: {gameData[0]}</p>
+          <p>Organiser: {labelAddress(gameData[0])}</p>
           <p>Token: {tokenSummaryLabel(gameData[1], activeTokenMetadata)}</p>
           {activeTokenMetadata ? <p className="muted">Token address: {gameData[1]}</p> : null}
           <p>Buy-in amount: {formatTokenAmount(gameData[2], TOKEN_DECIMALS)}</p>
@@ -135,7 +169,7 @@ export function GamePage({ gameId }: GamePageProps) {
           <ul>
             {whitelistAddresses.map((account) => (
               <li key={account}>
-                {account}
+                {labelAddress(account)}
                 {permissions.canManageWhitelist ? (
                   <button
                     className="secondary-button"
@@ -145,7 +179,7 @@ export function GamePage({ gameId }: GamePageProps) {
                       void Promise.resolve(writes.setWhitelist(gameId, account, false)).catch(() => undefined)
                     }
                   >
-                    Remove {account}
+                    Remove {labelAddress(account)}
                   </button>
                 ) : null}
               </li>
@@ -182,7 +216,7 @@ export function GamePage({ gameId }: GamePageProps) {
           <ul>
             {participantAddresses.map((participant) => (
               <li key={participant}>
-                <span>{participant}</span>
+                <span>{labelAddress(participant)}</span>
                 {participantCounts?.find((row) => row && sameAddress(row.account, participant)) ? (
                   <span>
                     Buy-ins:{" "}
@@ -212,7 +246,7 @@ export function GamePage({ gameId }: GamePageProps) {
             <ul>
               {(payouts.data as readonly [`0x${string}`[], bigint[]])[0].map((recipient, index) => (
                 <li key={`${recipient}-${index}`}>
-                  {recipient}:{" "}
+                  {labelAddress(recipient)}:{" "}
                   {formatTokenAmount(
                     (payouts.data as readonly [`0x${string}`[], bigint[]])[1][index] ?? 0n,
                     TOKEN_DECIMALS,
@@ -231,6 +265,7 @@ export function GamePage({ gameId }: GamePageProps) {
           disabled={writes.isPending}
           error={writes.error}
           isPending={writes.isPending}
+          resolveEnsName={resolveEnsName}
           onFinalize={(rows) =>
             void Promise.resolve(
               writes.finalize(

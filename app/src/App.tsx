@@ -1,5 +1,5 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HardhatGasButton } from "./components/HardhatGasButton";
 import { LocalTokenMintButton } from "./components/LocalTokenMintButton";
 import { CreateGamePage } from "./pages/CreateGamePage";
@@ -7,11 +7,26 @@ import { GamePage } from "./pages/GamePage";
 import "./styles.css";
 
 export function App() {
-  const [gameId, setGameId] = useState<bigint | undefined>();
+  const [pathname, setPathname] = useState(window.location.pathname);
   const routeGameId = useMemo(() => {
-    const match = window.location.pathname.match(/^\/game\/(\d+)$/);
-    return match ? BigInt(match[1]) : gameId;
-  }, [gameId]);
+    const match = pathname.match(/^\/game\/(\d+)$/);
+    return match ? BigInt(match[1]) : undefined;
+  }, [pathname]);
+
+  useEffect(() => {
+    function handlePopState() {
+      setPathname(window.location.pathname);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  function handleGameCreated(createdGameId: bigint) {
+    const gamePath = `/game/${createdGameId.toString()}`;
+    window.history.pushState({ gameId: createdGameId.toString() }, "", gamePath);
+    setPathname(gamePath);
+  }
 
   return (
     <main className="app-shell">
@@ -35,7 +50,7 @@ export function App() {
       {routeGameId ? (
         <GamePage gameId={routeGameId} />
       ) : (
-        <CreateGamePage onCreated={(createdGameId) => setGameId(createdGameId)} />
+        <CreateGamePage onCreated={handleGameCreated} />
       )}
     </main>
   );

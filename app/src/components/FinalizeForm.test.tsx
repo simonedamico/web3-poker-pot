@@ -102,6 +102,30 @@ describe("FinalizeForm", () => {
     expect(onFinalize).toHaveBeenCalledWith([{ recipient: CHECKSUM_ADDRESS, amount: 100n }]);
   });
 
+  it("resolves ENS payout recipients before finalizing", async () => {
+    const onFinalize = vi.fn();
+    const resolveEnsName = vi.fn().mockResolvedValue(RECIPIENT_1);
+    render(<FinalizeForm pot={100n} decimals={6} resolveEnsName={resolveEnsName} onFinalize={onFinalize} />);
+
+    fillPayout(1, "winner.eth", "0.0001");
+    fireEvent.click(screen.getByRole("button", { name: "Finalize payouts" }));
+
+    expect(resolveEnsName).toHaveBeenCalledWith("winner.eth");
+    await screen.findByText("Remaining: 0");
+    expect(onFinalize).toHaveBeenCalledWith([{ recipient: RECIPIENT_1, amount: 100n }]);
+  });
+
+  it("shows an error when an ENS payout recipient cannot be resolved", async () => {
+    const onFinalize = vi.fn();
+    render(<FinalizeForm pot={100n} decimals={6} resolveEnsName={vi.fn().mockResolvedValue(null)} onFinalize={onFinalize} />);
+
+    fillPayout(1, "missing.eth", "0.0001");
+    fireEvent.click(screen.getByRole("button", { name: "Finalize payouts" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("ENS name could not be resolved.");
+    expect(onFinalize).not.toHaveBeenCalled();
+  });
+
   it("ignores completely blank added payout rows", () => {
     const onFinalize = vi.fn();
     render(<FinalizeForm pot={100n} decimals={6} onFinalize={onFinalize} />);

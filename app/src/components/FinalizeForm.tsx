@@ -1,5 +1,5 @@
 import { type FormEvent, useMemo, useState } from "react";
-import { getAddress, isAddress, zeroAddress } from "viem";
+import { type EnsNameResolver, parseAddressInput, resolveAddressInput } from "../lib/address";
 import { formatTokenAmount, parseTokenAmount } from "../lib/tokenAmount";
 
 type PayoutInput = { recipient: `0x${string}`; amount: bigint };
@@ -10,11 +10,13 @@ type FinalizeFormProps = {
   disabled?: boolean;
   error?: string | null;
   isPending?: boolean;
+  resolveEnsName?: EnsNameResolver;
   onFinalize: (rows: PayoutInput[]) => void;
 };
 
 type ParsedRow = {
   recipient?: `0x${string}`;
+  ensName?: string;
   amount?: bigint;
   recipientError?: string;
   amountError?: string;
@@ -32,14 +34,16 @@ function parseDraftRow(row: DraftRow, decimals: number): ParsedRow {
 
   if (!recipient) {
     parsed.recipientError = "Enter a recipient address.";
-  } else if (!isAddress(recipient)) {
-    parsed.recipientError = "Enter a valid recipient address.";
   } else {
-    const normalized = getAddress(recipient);
-    if (normalized.toLowerCase() === zeroAddress) {
+    const parsedRecipient = parseAddressInput(recipient);
+    if (parsedRecipient.kind === "address") {
+      parsed.recipient = parsedRecipient.address;
+    } else if (parsedRecipient.kind === "ens") {
+      parsed.ensName = parsedRecipient.name;
+    } else if (parsedRecipient.error === "zero") {
       parsed.recipientError = "Recipient cannot be the zero address.";
     } else {
-      parsed.recipient = normalized;
+      parsed.recipientError = "Enter a valid recipient address or ENS name.";
     }
   }
 
@@ -58,9 +62,11 @@ export function FinalizeForm({
   disabled = false,
   error,
   isPending = false,
+  resolveEnsName = async () => null,
   onFinalize,
 }: FinalizeFormProps) {
   const [rows, setRows] = useState<DraftRow[]>([EMPTY_ROW]);
+  const [recipientSubmitErrors, setRecipientSubmitErrors] = useState<Record<number, string>>({});
 
   const parsedRows = useMemo(() => rows.map((row) => parseDraftRow(row, decimals)), [decimals, rows]);
   const activeRows = useMemo(
@@ -72,11 +78,18 @@ export function FinalizeForm({
   );
   const total = activeRows.reduce((sum, row) => sum + (row.parsed.amount ?? 0n), 0n);
   const remaining = pot - total;
-  const rowsValid = activeRows.every((row) => row.parsed.recipient && row.parsed.amount !== undefined);
+  const rowsValid = activeRows.every(
+    (row) => (row.parsed.recipient || row.parsed.ensName) && row.parsed.amount !== undefined,
+  );
   const formDisabled = disabled || isPending;
   const canFinalize = !formDisabled && activeRows.length > 0 && rowsValid && total === pot;
 
   function updateRow(index: number, field: keyof DraftRow, value: string) {
+    setRecipientSubmitErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[index];
+      return nextErrors;
+    });
     setRows((currentRows) =>
       currentRows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
     );
@@ -90,16 +103,34 @@ export function FinalizeForm({
     setRows((currentRows) => currentRows.filter((_, rowIndex) => rowIndex !== index));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canFinalize) return;
 
-    onFinalize(
-      activeRows.map((row) => ({
-        recipient: row.parsed.recipient!,
-        amount: row.parsed.amount!,
-      })),
-    );
+    const resolvedRows: PayoutInput[] = [];
+    const nextSubmitErrors: Record<number, string> = {};
+
+    for (const row of activeRows) {
+      const rowIndex = rows.indexOf(row.draft);
+      if (row.parsed.recipient) {
+        resolvedRows.push({ recipient: row.parsed.recipient, amount: row.parsed.amount! });
+        continue;
+      }
+
+      const result = await resolveAddressInput(row.draft.recipient, resolveEnsName);
+      if (result.error || !result.address) {
+        nextSubmitErrors[rowIndex] =
+          result.error === "zero" ? "Recipient cannot be the zero address." : "ENS name could not be resolved.";
+        continue;
+      }
+
+      resolvedRows.push({ recipient: result.address, amount: row.parsed.amount! });
+    }
+
+    setRecipientSubmitErrors(nextSubmitErrors);
+    if (Object.keys(nextSubmitErrors).length > 0) return;
+
+    onFinalize(resolvedRows);
   }
 
   return (
@@ -117,6 +148,8 @@ export function FinalizeForm({
           const recipientErrorId = `finalize-recipient-error-${rowNumber}`;
           const amountErrorId = `finalize-amount-error-${rowNumber}`;
           const showRecipientError = !rowIsBlank && parsedRow.recipientError;
+          const recipientSubmitError = recipientSubmitErrors[index];
+          const recipientError = showRecipientError ? parsedRow.recipientError : recipientSubmitError;
           const showAmountError = !rowIsBlank && parsedRow.amountError;
 
           return (
@@ -125,16 +158,16 @@ export function FinalizeForm({
                 <span>Recipient {rowNumber}</span>
                 <input
                   aria-label={`Recipient ${rowNumber}`}
-                  aria-describedby={showRecipientError ? recipientErrorId : undefined}
-                  aria-invalid={showRecipientError ? "true" : undefined}
+                  aria-describedby={recipientError ? recipientErrorId : undefined}
+                  aria-invalid={recipientError ? "true" : undefined}
                   disabled={formDisabled}
                   value={row.recipient}
                   onChange={(event) => updateRow(index, "recipient", event.target.value)}
                 />
               </label>
-              {showRecipientError ? (
+              {recipientError ? (
                 <p className="error-text" id={recipientErrorId} role="alert">
-                  {parsedRow.recipientError}
+                  {recipientError}
                 </p>
               ) : null}
 

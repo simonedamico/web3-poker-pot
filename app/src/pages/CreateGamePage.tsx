@@ -2,9 +2,10 @@ import { type FormEvent, useState } from "react";
 import { AddressListInput } from "../components/AddressListInput";
 import { TokenAmountInput } from "../components/TokenAmountInput";
 import { allowlistedTokens } from "../contracts/pokerPot";
+import { useEnsNameResolver } from "../hooks/useEnsNames";
 import { usePokerPotWrites } from "../hooks/usePokerPot";
 import { tokenDisplayLabel, tokenMetadataKey, useTokenMetadata } from "../hooks/useTokenMetadata";
-import { normalizeAddressList } from "../lib/address";
+import { resolveAddressList } from "../lib/address";
 import { parseTokenAmount } from "../lib/tokenAmount";
 
 const ERROR_ID = "create-game-error";
@@ -37,6 +38,7 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
   const [isCreating, setIsCreating] = useState(false);
   const pokerPot = usePokerPotWrites();
   const tokenMetadata = useTokenMetadata(availableTokens);
+  const resolveEnsName = useEnsNameResolver();
 
   const hasTokenOptions = availableTokens.length > 0;
   const formDisabled = !hasTokenOptions || pokerPot.isPending || isCreating;
@@ -65,18 +67,18 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
       return;
     }
 
-    const whitelistResult = normalizeAddressList(whitelist);
+    if (!token || !availableTokens.some((availableToken) => availableToken === token)) {
+      showError("token", "Select an allowlisted token.");
+      return;
+    }
+
+    const whitelistResult = await resolveAddressList(whitelist, resolveEnsName);
     if (whitelistResult.errors.length > 0) {
       showError("whitelist", whitelistResult.errors[0]);
       return;
     }
     if (whitelistResult.addresses.length === 0) {
       showError("whitelist", "Add at least one whitelisted address.");
-      return;
-    }
-
-    if (!token || !availableTokens.some((availableToken) => availableToken === token)) {
-      showError("token", "Select an allowlisted token.");
       return;
     }
 
