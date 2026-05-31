@@ -125,6 +125,21 @@ button {
   gap: 4px;
 }
 
+.local-test-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid rgba(240, 193, 75, 0.55);
+  border-radius: 8px;
+  background: rgba(5, 25, 18, 0.46);
+}
+
+.local-test-panel p {
+  margin-bottom: 0;
+}
+
 h1,
 h2,
 p {
@@ -287,12 +302,19 @@ li .secondary-button {
   }
 
   .app-actions,
-  .gas-faucet {
+  .gas-faucet,
+  .local-test-panel {
     width: 100%;
   }
 
+  .local-test-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .app-actions > *,
-  .gas-faucet .secondary-button {
+  .gas-faucet .secondary-button,
+  .local-test-panel .secondary-button {
     width: 100%;
   }
 

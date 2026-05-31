@@ -5,6 +5,7 @@ import { CreateGamePage } from "./CreateGamePage";
 const TOKEN = "0x0000000000000000000000000000000000000002" as const;
 const OTHER_TOKEN = "0x0000000000000000000000000000000000000003" as const;
 const WHITELIST_ADDRESS = "0x0000000000000000000000000000000000000001";
+const HARDHAT_ACCOUNT = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266";
 
 const pokerPotWrites = vi.hoisted(() => ({
   createGame: vi.fn(),
@@ -62,7 +63,18 @@ describe("CreateGamePage", () => {
       screen.getByText("No allowlisted tokens are configured. Run deployment setup before creating a game."),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Buy-in amount")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fill local test table" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create game" })).toBeDisabled();
+  });
+
+  it("fills a valid local hardhat test table", () => {
+    render(<CreateGamePage onCreated={vi.fn()} availableTokens={[TOKEN]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Fill local test table" }));
+
+    expect(screen.getByLabelText("Token")).toHaveValue(TOKEN);
+    expect(screen.getByLabelText("Buy-in amount")).toHaveValue("10");
+    expect((screen.getByLabelText("Whitelist addresses") as HTMLTextAreaElement).value).toContain(HARDHAT_ACCOUNT);
   });
 
   it("blocks creation when no token is selected", () => {

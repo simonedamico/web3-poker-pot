@@ -8,6 +8,12 @@ import { parseTokenAmount } from "../lib/tokenAmount";
 
 const ERROR_ID = "create-game-error";
 const NO_TOKENS_MESSAGE = "No allowlisted tokens are configured. Run deployment setup before creating a game.";
+const LOCAL_TEST_BUY_IN_AMOUNT = "10";
+const LOCAL_TEST_WHITELIST = [
+  "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+  "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
+].join("\n");
 
 type ErrorField = "token" | "buyInAmount" | "whitelist";
 
@@ -32,6 +38,8 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
 
   const hasTokenOptions = availableTokens.length > 0;
   const formDisabled = !hasTokenOptions || pokerPot.isPending || isCreating;
+  const showLocalTestHelper =
+    hasTokenOptions && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
   function showError(field: ErrorField, message: string) {
     setSubmitError({ field, message });
@@ -81,6 +89,16 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
     }
   }
 
+  function fillLocalTestTable() {
+    if (!hasTokenOptions) return;
+
+    setToken(availableTokens[0]);
+    setBuyInAmount(LOCAL_TEST_BUY_IN_AMOUNT);
+    setWhitelist(LOCAL_TEST_WHITELIST);
+    setSubmitError(null);
+    setCreateError(null);
+  }
+
   return (
     <section className="panel stack">
       <header className="panel-heading">
@@ -89,6 +107,17 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
         <p className="muted">Set the stakes, invite the seats, and choose the token for tonight's pot.</p>
       </header>
       <form className="stack" onSubmit={handleSubmit}>
+        {showLocalTestHelper ? (
+          <section className="local-test-panel">
+            <div>
+              <p className="eyebrow">Hardhat fixture</p>
+              <p className="muted">Token, stakes, and three seats ready for a local table.</p>
+            </div>
+            <button className="secondary-button" type="button" onClick={fillLocalTestTable}>
+              Fill local test table
+            </button>
+          </section>
+        ) : null}
         <label className="field">
           <span>Token</span>
           <select
