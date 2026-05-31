@@ -37,6 +37,8 @@ contract PokerPot is Ownable, ReentrancyGuard {
     error NotWhitelisted();
     error InvalidBuyInCount();
     error TokenTransferAmountMismatch();
+    error InvalidPayouts();
+    error PayoutTotalMismatch();
 
     uint256 public nextGameId = 1;
 
@@ -51,6 +53,7 @@ contract PokerPot is Ownable, ReentrancyGuard {
     event GameCreated(uint256 indexed gameId, address indexed organiser, address indexed token, uint256 buyInAmount);
     event WhitelistUpdated(uint256 indexed gameId, address indexed account, bool allowed);
     event BuyIn(uint256 indexed gameId, address indexed participant, uint256 count, uint256 amount);
+    event GameFinalized(uint256 indexed gameId, uint256 totalPaid);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -135,6 +138,39 @@ contract PokerPot is Ownable, ReentrancyGuard {
 
     function getParticipants(uint256 gameId) external view returns (address[] memory) {
         return _requireGame(gameId).participants;
+    }
+
+    function finalize(uint256 gameId, address[] calldata recipients, uint256[] calldata amounts) external nonReentrant {
+        Game storage game = _requireGame(gameId);
+        if (msg.sender != game.organiser) revert OnlyOrganiser();
+        if (game.status != GameStatus.Open) revert GameClosed();
+        if (recipients.length == 0 || recipients.length != amounts.length) revert InvalidPayouts();
+
+        uint256 totalPaid = 0;
+        for (uint256 i = 0; i < recipients.length; i++) {
+            if (recipients[i] == address(0)) revert InvalidAddress();
+            totalPaid += amounts[i];
+        }
+        if (totalPaid != game.totalPot) revert PayoutTotalMismatch();
+
+        game.status = GameStatus.Finalized;
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            game.payoutRecipients.push(recipients[i]);
+            game.payoutAmounts.push(amounts[i]);
+            IERC20(game.token).safeTransfer(recipients[i], amounts[i]);
+        }
+
+        emit GameFinalized(gameId, totalPaid);
+    }
+
+    function getPayouts(uint256 gameId)
+        external
+        view
+        returns (address[] memory recipients, uint256[] memory amounts)
+    {
+        Game storage game = _requireGame(gameId);
+        return (game.payoutRecipients, game.payoutAmounts);
     }
 
     function _setWhitelist(uint256 gameId, address account, bool allowed) private {
