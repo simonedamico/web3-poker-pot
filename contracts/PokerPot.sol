@@ -36,6 +36,7 @@ contract PokerPot is Ownable, ReentrancyGuard {
     error GameClosed();
     error NotWhitelisted();
     error InvalidBuyInCount();
+    error TokenTransferAmountMismatch();
 
     uint256 public nextGameId = 1;
 
@@ -113,7 +114,13 @@ contract PokerPot is Ownable, ReentrancyGuard {
         if (!isWhitelisted[gameId][msg.sender]) revert NotWhitelisted();
 
         uint256 amount = game.buyInAmount * count;
-        IERC20(game.token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20 token = IERC20(game.token);
+        uint256 balanceBefore = token.balanceOf(address(this));
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 balanceAfter = token.balanceOf(address(this));
+        if (balanceAfter < balanceBefore || balanceAfter - balanceBefore != amount) {
+            revert TokenTransferAmountMismatch();
+        }
 
         buyInCount[gameId][msg.sender] += count;
         game.totalPot += amount;
