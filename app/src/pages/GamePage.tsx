@@ -3,6 +3,7 @@ import { getAddress, isAddress } from "viem";
 import { useAccount } from "wagmi";
 import { FinalizeForm } from "../components/FinalizeForm";
 import { type GameData, usePokerPotGame, usePokerPotWrites } from "../hooks/usePokerPot";
+import { tokenMetadataKey, tokenSummaryLabel, useTokenMetadata } from "../hooks/useTokenMetadata";
 import { normalizeAddressList } from "../lib/address";
 import { deriveGamePermissions } from "../lib/gameView";
 import { formatTokenAmount } from "../lib/tokenAmount";
@@ -31,6 +32,9 @@ export function GamePage({ gameId }: GamePageProps) {
   const writes = usePokerPotWrites();
 
   const gameData = game.data as GameData | undefined;
+  const activeToken = gameData?.[1];
+  const tokenMetadata = useTokenMetadata(activeToken ? [activeToken] : []);
+  const activeTokenMetadata = activeToken ? tokenMetadata.metadataByAddress[tokenMetadataKey(activeToken)] : undefined;
   const whitelistAddresses = (whitelist.data ?? []) as `0x${string}`[];
   const participantAddresses = (participants.data ?? []) as `0x${string}`[];
   const participantCounts = participantBuyIns.data;
@@ -95,7 +99,8 @@ export function GamePage({ gameId }: GamePageProps) {
         <section className="stack">
           <h2>Game details</h2>
           <p>Organiser: {gameData[0]}</p>
-          <p>Token: {gameData[1]}</p>
+          <p>Token: {tokenSummaryLabel(gameData[1], activeTokenMetadata)}</p>
+          {activeTokenMetadata ? <p className="muted">Token address: {gameData[1]}</p> : null}
           <p>Buy-in amount: {formatTokenAmount(gameData[2], TOKEN_DECIMALS)}</p>
           <p>Status: {statusLabel(gameData[3])}</p>
           <p>Total pot: {formatTokenAmount(gameData[4], TOKEN_DECIMALS)}</p>

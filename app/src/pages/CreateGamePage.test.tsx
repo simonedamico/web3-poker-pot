@@ -12,9 +12,23 @@ const pokerPotWrites = vi.hoisted(() => ({
   isPending: false,
   error: null as string | null,
 }));
+const tokenMetadataState = vi.hoisted(() => ({
+  metadataByAddress: {} as Record<string, { address: `0x${string}`; name?: string; symbol?: string }>,
+}));
 
 vi.mock("../hooks/usePokerPot", () => ({
   usePokerPotWrites: () => pokerPotWrites,
+}));
+
+vi.mock("../hooks/useTokenMetadata", () => ({
+  useTokenMetadata: () => ({
+    metadataByAddress: tokenMetadataState.metadataByAddress,
+  }),
+  tokenDisplayLabel: (
+    address: `0x${string}`,
+    metadata?: { address: `0x${string}`; name?: string; symbol?: string },
+  ) => (metadata?.name && metadata?.symbol ? `${metadata.name} (${metadata.symbol}) - ${address}` : address),
+  tokenMetadataKey: (address: `0x${string}`) => address.toLowerCase(),
 }));
 
 describe("CreateGamePage", () => {
@@ -22,6 +36,7 @@ describe("CreateGamePage", () => {
     pokerPotWrites.createGame.mockReset();
     pokerPotWrites.isPending = false;
     pokerPotWrites.error = null;
+    tokenMetadataState.metadataByAddress = {};
   });
 
   it("blocks creation when buy-in amount is invalid", () => {
@@ -75,6 +90,16 @@ describe("CreateGamePage", () => {
     expect(screen.getByLabelText("Token")).toHaveValue(TOKEN);
     expect(screen.getByLabelText("Buy-in amount")).toHaveValue("10");
     expect((screen.getByLabelText("Whitelist addresses") as HTMLTextAreaElement).value).toContain(HARDHAT_ACCOUNT);
+  });
+
+  it("shows the token name and symbol in token choices", () => {
+    tokenMetadataState.metadataByAddress = {
+      [TOKEN.toLowerCase()]: { address: TOKEN, name: "Poker USD", symbol: "PUSD" },
+    };
+
+    render(<CreateGamePage onCreated={vi.fn()} availableTokens={[TOKEN]} />);
+
+    expect(screen.getByRole("option", { name: `Poker USD (PUSD) - ${TOKEN}` })).toBeInTheDocument();
   });
 
   it("blocks creation when no token is selected", () => {

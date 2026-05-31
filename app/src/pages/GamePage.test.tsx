@@ -45,6 +45,9 @@ const hookState = vi.hoisted(() => ({
     error: null as string | null,
   },
 }));
+const tokenMetadataState = vi.hoisted(() => ({
+  metadataByAddress: {} as Record<string, { address: `0x${string}`; name?: string; symbol?: string }>,
+}));
 
 vi.mock("wagmi", () => ({
   useAccount: () => ({ address: hookState.account }),
@@ -61,6 +64,17 @@ vi.mock("../hooks/usePokerPot", () => ({
     payouts: hookState.payouts,
   }),
   usePokerPotWrites: () => hookState.writes,
+}));
+
+vi.mock("../hooks/useTokenMetadata", () => ({
+  useTokenMetadata: () => ({
+    metadataByAddress: tokenMetadataState.metadataByAddress,
+  }),
+  tokenSummaryLabel: (
+    address: `0x${string}`,
+    metadata?: { address: `0x${string}`; name?: string; symbol?: string },
+  ) => (metadata?.name && metadata?.symbol ? `${metadata.name} (${metadata.symbol})` : address),
+  tokenMetadataKey: (address: `0x${string}`) => address.toLowerCase(),
 }));
 
 describe("GamePage", () => {
@@ -87,6 +101,7 @@ describe("GamePage", () => {
     hookState.writes.finalize.mockReset();
     hookState.writes.isPending = false;
     hookState.writes.error = null;
+    tokenMetadataState.metadataByAddress = {};
   });
 
   it("renders live game metadata, whitelist, participants, and buy-in counts", () => {
@@ -102,6 +117,17 @@ describe("GamePage", () => {
     expect(screen.getAllByText(addresses.participant)).toHaveLength(2);
     expect(screen.getByText("Buy-ins: 2")).toBeInTheDocument();
     expect(screen.getByText("Your buy-ins: 2")).toBeInTheDocument();
+  });
+
+  it("shows token name, symbol, and address in game details", () => {
+    tokenMetadataState.metadataByAddress = {
+      [addresses.token.toLowerCase()]: { address: addresses.token, name: "Poker USD", symbol: "PUSD" },
+    };
+
+    render(<GamePage gameId={1n} />);
+
+    expect(screen.getByText("Token: Poker USD (PUSD)")).toBeInTheDocument();
+    expect(screen.getByText(`Token address: ${addresses.token}`)).toBeInTheDocument();
   });
 
   it("does not render missing participant buy-in counts as zero", () => {

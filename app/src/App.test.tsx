@@ -12,6 +12,14 @@ vi.mock("./hooks/usePokerPot", () => ({
   usePokerPotWrites: () => pokerPotWrites,
 }));
 
+vi.mock("./hooks/useTokenMetadata", () => ({
+  useTokenMetadata: () => ({
+    metadataByAddress: {},
+  }),
+  tokenDisplayLabel: (address: `0x${string}`) => address,
+  tokenMetadataKey: (address: `0x${string}`) => address.toLowerCase(),
+}));
+
 vi.mock("@rainbow-me/rainbowkit", () => ({
   ConnectButton: () => <button type="button">Connect wallet</button>,
 }));

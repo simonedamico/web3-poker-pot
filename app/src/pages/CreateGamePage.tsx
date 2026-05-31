@@ -3,6 +3,7 @@ import { AddressListInput } from "../components/AddressListInput";
 import { TokenAmountInput } from "../components/TokenAmountInput";
 import { allowlistedTokens } from "../contracts/pokerPot";
 import { usePokerPotWrites } from "../hooks/usePokerPot";
+import { tokenDisplayLabel, tokenMetadataKey, useTokenMetadata } from "../hooks/useTokenMetadata";
 import { normalizeAddressList } from "../lib/address";
 import { parseTokenAmount } from "../lib/tokenAmount";
 
@@ -35,6 +36,7 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const pokerPot = usePokerPotWrites();
+  const tokenMetadata = useTokenMetadata(availableTokens);
 
   const hasTokenOptions = availableTokens.length > 0;
   const formDisabled = !hasTokenOptions || pokerPot.isPending || isCreating;
@@ -130,7 +132,10 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
             <option value="">Select token</option>
             {availableTokens.map((allowlistedToken) => (
               <option key={allowlistedToken} value={allowlistedToken}>
-                {allowlistedToken}
+                {tokenDisplayLabel(
+                  allowlistedToken,
+                  tokenMetadata.metadataByAddress[tokenMetadataKey(allowlistedToken)],
+                )}
               </option>
             ))}
           </select>
