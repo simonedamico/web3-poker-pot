@@ -33,7 +33,7 @@ export function GamePage({ gameId }: GamePageProps) {
   const gameData = game.data as GameData | undefined;
   const whitelistAddresses = (whitelist.data ?? []) as `0x${string}`[];
   const participantAddresses = (participants.data ?? []) as `0x${string}`[];
-  const participantCounts = participantBuyIns.data ?? [];
+  const participantCounts = participantBuyIns.data;
   const isOpen = gameData ? gameData[3] === 0 : false;
   const isConnectedWhitelisted = whitelistAddresses.some((account) => sameAddress(account, connected));
   const allowanceAmount = allowance.data as bigint | undefined;
@@ -68,17 +68,17 @@ export function GamePage({ gameId }: GamePageProps) {
       return;
     }
 
-    writes.setWhitelist(gameId, result.addresses[0], true);
+    void Promise.resolve(writes.setWhitelist(gameId, result.addresses[0], true)).catch(() => undefined);
     setWhitelistAccount("");
   }
 
   function handleBuyIn() {
     if (!gameData || allowanceAmount === undefined) return;
     if (allowanceAmount < gameData[2]) {
-      writes.approve(gameData[1], gameData[2]);
+      void Promise.resolve(writes.approve(gameData[1], gameData[2])).catch(() => undefined);
       return;
     }
-    writes.buyIn(gameId, 1n);
+    void Promise.resolve(writes.buyIn(gameId, 1n)).catch(() => undefined);
   }
 
   return (
@@ -125,7 +125,9 @@ export function GamePage({ gameId }: GamePageProps) {
                     className="secondary-button"
                     type="button"
                     disabled={writes.isPending}
-                    onClick={() => writes.setWhitelist(gameId, account, false)}
+                    onClick={() =>
+                      void Promise.resolve(writes.setWhitelist(gameId, account, false)).catch(() => undefined)
+                    }
                   >
                     Remove {account}
                   </button>
@@ -157,12 +159,22 @@ export function GamePage({ gameId }: GamePageProps) {
       <section className="stack">
         <h2>Participants</h2>
         {participants.error ? <p className="error-text" role="alert">{participants.error.message}</p> : null}
-        {participantAddresses.length > 0 ? (
+        {participantBuyIns.error ? <p className="error-text" role="alert">{participantBuyIns.error.message}</p> : null}
+        {participantAddresses.length > 0 && participantBuyIns.isLoading ? (
+          <p className="muted">Loading participant buy-ins...</p>
+        ) : participantAddresses.length > 0 && participantBuyIns.error ? null : participantAddresses.length > 0 ? (
           <ul>
             {participantAddresses.map((participant) => (
               <li key={participant}>
                 <span>{participant}</span>
-                <span>Buy-ins: {participantCounts.find((row) => sameAddress(row.account, participant))?.count.toString() ?? "0"}</span>
+                {participantCounts?.find((row) => row && sameAddress(row.account, participant)) ? (
+                  <span>
+                    Buy-ins:{" "}
+                    {participantCounts.find((row) => row && sameAddress(row.account, participant))?.count.toString()}
+                  </span>
+                ) : (
+                  <span className="muted">Buy-ins unavailable</span>
+                )}
               </li>
             ))}
           </ul>
@@ -204,11 +216,13 @@ export function GamePage({ gameId }: GamePageProps) {
           error={writes.error}
           isPending={writes.isPending}
           onFinalize={(rows) =>
-            writes.finalize(
-              gameId,
-              rows.map((row) => row.recipient),
-              rows.map((row) => row.amount),
-            )
+            void Promise.resolve(
+              writes.finalize(
+                gameId,
+                rows.map((row) => row.recipient),
+                rows.map((row) => row.amount),
+              ),
+            ).catch(() => undefined)
           }
         />
       ) : null}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateGamePage } from "./CreateGamePage";
 
@@ -94,8 +94,9 @@ describe("CreateGamePage", () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it("creates a contract game with parsed amount and normalized whitelist", () => {
+  it("routes to the mined game id from the GameCreated event", async () => {
     const onCreated = vi.fn();
+    pokerPotWrites.createGame.mockResolvedValue(42n);
     render(<CreateGamePage onCreated={onCreated} availableTokens={[TOKEN]} />);
 
     fireEvent.change(screen.getByLabelText("Token"), { target: { value: TOKEN } });
@@ -104,7 +105,24 @@ describe("CreateGamePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create game" }));
 
     expect(pokerPotWrites.createGame).toHaveBeenCalledWith(TOKEN, 25_000_000n, [WHITELIST_ADDRESS]);
-    expect(onCreated).toHaveBeenCalledWith(1n);
+    expect(onCreated).not.toHaveBeenCalled();
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(42n));
+  });
+
+  it("keeps the user on the create page and shows create errors", async () => {
+    const onCreated = vi.fn();
+    pokerPotWrites.createGame.mockRejectedValue(new Error("GameCreated event was not found in the transaction receipt."));
+    render(<CreateGamePage onCreated={onCreated} availableTokens={[TOKEN]} />);
+
+    fireEvent.change(screen.getByLabelText("Token"), { target: { value: TOKEN } });
+    fireEvent.change(screen.getByLabelText("Buy-in amount"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Whitelist addresses"), { target: { value: WHITELIST_ADDRESS } });
+    fireEvent.click(screen.getByRole("button", { name: "Create game" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("GameCreated event was not found in the transaction receipt."),
+    );
+    expect(onCreated).not.toHaveBeenCalled();
   });
 
   it("disables creation while the wallet write is pending and displays write errors", () => {

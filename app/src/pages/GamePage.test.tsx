@@ -25,7 +25,7 @@ const hookState = vi.hoisted(() => ({
   whitelist: { data: [addresses.participant] as `0x${string}`[], isLoading: false, error: null as Error | null },
   participants: { data: [addresses.participant] as `0x${string}`[], isLoading: false, error: null as Error | null },
   participantBuyIns: {
-    data: [{ account: addresses.participant, count: 2n }] as { account: `0x${string}`; count: bigint }[],
+    data: [{ account: addresses.participant, count: 2n }] as ({ account: `0x${string}`; count: bigint } | undefined)[] | undefined,
     isLoading: false,
     error: null as Error | null,
   },
@@ -72,6 +72,8 @@ describe("GamePage", () => {
     hookState.whitelist.data = [addresses.participant];
     hookState.participants.data = [addresses.participant];
     hookState.participantBuyIns.data = [{ account: addresses.participant, count: 2n }];
+    hookState.participantBuyIns.isLoading = false;
+    hookState.participantBuyIns.error = null;
     hookState.connectedBuyInCount.data = 2n;
     hookState.allowance.data = 0n;
     hookState.allowance.isLoading = false;
@@ -100,6 +102,26 @@ describe("GamePage", () => {
     expect(screen.getAllByText(addresses.participant)).toHaveLength(2);
     expect(screen.getByText("Buy-ins: 2")).toBeInTheDocument();
     expect(screen.getByText("Your buy-ins: 2")).toBeInTheDocument();
+  });
+
+  it("does not render missing participant buy-in counts as zero", () => {
+    hookState.participantBuyIns.data = undefined;
+    hookState.participantBuyIns.isLoading = true;
+
+    render(<GamePage gameId={1n} />);
+
+    expect(screen.getByText("Loading participant buy-ins...")).toBeInTheDocument();
+    expect(screen.queryByText("Buy-ins: 0")).not.toBeInTheDocument();
+  });
+
+  it("surfaces participant buy-in count read errors", () => {
+    hookState.participantBuyIns.data = undefined;
+    hookState.participantBuyIns.error = new Error("Buy-in count read failed.");
+
+    render(<GamePage gameId={1n} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Buy-in count read failed.");
+    expect(screen.queryByText("Buy-ins: 0")).not.toBeInTheDocument();
   });
 
   it("asks a whitelisted user to approve before buying in when allowance is insufficient", () => {
