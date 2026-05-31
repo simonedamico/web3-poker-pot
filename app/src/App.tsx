@@ -1,5 +1,6 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useMemo, useState } from "react";
+import { HardhatGasButton } from "./components/HardhatGasButton";
 import { CreateGamePage } from "./pages/CreateGamePage";
 import { GamePage } from "./pages/GamePage";
 import "./styles.css";
@@ -14,8 +15,20 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="app-toolbar">
-        <span className="app-title">Web3 Poker Pot</span>
-        <ConnectButton />
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true">
+            <span>A</span>
+            <span>K</span>
+          </div>
+          <div className="brand-copy">
+            <span className="app-title">Poker Pot Table</span>
+            <span className="app-subtitle">Table stakes, buy-ins, and final chip splits onchain</span>
+          </div>
+        </div>
+        <div className="app-actions">
+          <HardhatGasButton />
+          <ConnectButton />
+        </div>
       </header>
       {routeGameId ? (
         <GamePage gameId={routeGameId} />

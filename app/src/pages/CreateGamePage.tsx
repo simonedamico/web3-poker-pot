@@ -83,7 +83,11 @@ export function CreateGamePage({ onCreated, availableTokens = allowlistedTokens 
 
   return (
     <section className="panel stack">
-      <h1>Create poker pot</h1>
+      <header className="panel-heading">
+        <p className="eyebrow">Game setup</p>
+        <h1>Open a poker table</h1>
+        <p className="muted">Set the stakes, invite the seats, and choose the token for tonight's pot.</p>
+      </header>
       <form className="stack" onSubmit={handleSubmit}>
         <label className="field">
           <span>Token</span>

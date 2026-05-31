@@ -8,7 +8,7 @@ import { hardhat } from "wagmi/chains";
 import { App } from "./App";
 
 const config = getDefaultConfig({
-  appName: "Web3 Poker Pot",
+  appName: "Poker Pot Table",
   projectId: "local-development",
   chains: [hardhat],
   ssr: false,

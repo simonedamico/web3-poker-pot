@@ -16,11 +16,15 @@ vi.mock("@rainbow-me/rainbowkit", () => ({
   ConnectButton: () => <button type="button">Connect wallet</button>,
 }));
 
+vi.mock("./components/HardhatGasButton", () => ({
+  HardhatGasButton: () => <button type="button">Get hardhat gas</button>,
+}));
+
 describe("App", () => {
   it("renders the create-game view by default", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Create poker pot" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Open a poker table" })).toBeInTheDocument();
     expect(screen.getByLabelText("Buy-in amount")).toBeInTheDocument();
   });
 
@@ -28,5 +32,18 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument();
+  });
+
+  it("renders the local hardhat gas control", () => {
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: "Get hardhat gas" })).toBeInTheDocument();
+  });
+
+  it("uses poker table branding in the toolbar", () => {
+    render(<App />);
+
+    expect(screen.getByText("Poker Pot Table")).toBeInTheDocument();
+    expect(screen.getByText("Table stakes, buy-ins, and final chip splits onchain")).toBeInTheDocument();
   });
 });
