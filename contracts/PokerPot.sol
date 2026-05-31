@@ -4,11 +4,42 @@ pragma solidity ^0.8.24;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PokerPot is Ownable {
+    enum GameStatus {
+        Open,
+        Finalized
+    }
+
+    struct Game {
+        address organiser;
+        address token;
+        uint256 buyInAmount;
+        GameStatus status;
+        uint256 totalPot;
+        address[] whitelist;
+        address[] participants;
+        address[] payoutRecipients;
+        uint256[] payoutAmounts;
+    }
+
     error InvalidToken();
+    error TokenNotAllowed();
+    error InvalidBuyInAmount();
+    error EmptyWhitelist();
+    error InvalidAddress();
+    error GameNotFound();
+    error OnlyOrganiser();
+    error GameClosed();
+
+    uint256 public nextGameId = 1;
 
     mapping(address => bool) private allowedTokens;
+    mapping(uint256 => Game) private games;
+    mapping(uint256 => mapping(address => bool)) public isWhitelisted;
+    mapping(uint256 => mapping(address => uint256)) private whitelistIndexPlusOne;
 
     event TokenAllowlistUpdated(address indexed token, bool allowed);
+    event GameCreated(uint256 indexed gameId, address indexed organiser, address indexed token, uint256 buyInAmount);
+    event WhitelistUpdated(uint256 indexed gameId, address indexed account, bool allowed);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -20,5 +51,78 @@ contract PokerPot is Ownable {
 
     function isTokenAllowed(address token) external view returns (bool) {
         return allowedTokens[token];
+    }
+
+    function createGame(address token, uint256 buyInAmount, address[] calldata initialWhitelist)
+        external
+        returns (uint256 gameId)
+    {
+        if (!allowedTokens[token]) revert TokenNotAllowed();
+        if (buyInAmount == 0) revert InvalidBuyInAmount();
+        if (initialWhitelist.length == 0) revert EmptyWhitelist();
+
+        gameId = nextGameId++;
+        Game storage game = games[gameId];
+        game.organiser = msg.sender;
+        game.token = token;
+        game.buyInAmount = buyInAmount;
+        game.status = GameStatus.Open;
+
+        for (uint256 i = 0; i < initialWhitelist.length; i++) {
+            _setWhitelist(gameId, initialWhitelist[i], true);
+        }
+
+        emit GameCreated(gameId, msg.sender, token, buyInAmount);
+    }
+
+    function setWhitelist(uint256 gameId, address account, bool allowed) external {
+        Game storage game = _requireGame(gameId);
+        if (msg.sender != game.organiser) revert OnlyOrganiser();
+        if (game.status != GameStatus.Open) revert GameClosed();
+        _setWhitelist(gameId, account, allowed);
+        emit WhitelistUpdated(gameId, account, allowed);
+    }
+
+    function getGame(uint256 gameId)
+        external
+        view
+        returns (address organiser, address token, uint256 buyInAmount, GameStatus status, uint256 totalPot)
+    {
+        Game storage game = _requireGame(gameId);
+        return (game.organiser, game.token, game.buyInAmount, game.status, game.totalPot);
+    }
+
+    function getWhitelist(uint256 gameId) external view returns (address[] memory) {
+        return _requireGame(gameId).whitelist;
+    }
+
+    function _setWhitelist(uint256 gameId, address account, bool allowed) private {
+        if (account == address(0)) revert InvalidAddress();
+        bool current = isWhitelisted[gameId][account];
+        if (allowed == current) return;
+
+        Game storage game = games[gameId];
+        isWhitelisted[gameId][account] = allowed;
+
+        if (allowed) {
+            game.whitelist.push(account);
+            whitelistIndexPlusOne[gameId][account] = game.whitelist.length;
+            return;
+        }
+
+        uint256 index = whitelistIndexPlusOne[gameId][account] - 1;
+        uint256 lastIndex = game.whitelist.length - 1;
+        if (index != lastIndex) {
+            address lastAccount = game.whitelist[lastIndex];
+            game.whitelist[index] = lastAccount;
+            whitelistIndexPlusOne[gameId][lastAccount] = index + 1;
+        }
+        game.whitelist.pop();
+        whitelistIndexPlusOne[gameId][account] = 0;
+    }
+
+    function _requireGame(uint256 gameId) private view returns (Game storage game) {
+        game = games[gameId];
+        if (game.organiser == address(0)) revert GameNotFound();
     }
 }
