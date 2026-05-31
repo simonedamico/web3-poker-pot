@@ -36,6 +36,14 @@ export function GamePage({ gameId }: GamePageProps) {
   const participantCounts = participantBuyIns.data ?? [];
   const isOpen = gameData ? gameData[3] === 0 : false;
   const isConnectedWhitelisted = whitelistAddresses.some((account) => sameAddress(account, connected));
+  const allowanceAmount = allowance.data as bigint | undefined;
+  const allowanceReady = allowanceAmount !== undefined;
+  const buyInAmount = gameData?.[2] ?? 0n;
+  const buyInButtonLabel = !allowanceReady
+    ? "Checking allowance"
+    : allowanceAmount < buyInAmount
+      ? "Approve buy-in"
+      : "Buy in";
   const permissions = gameData
     ? deriveGamePermissions({
         connected,
@@ -65,8 +73,8 @@ export function GamePage({ gameId }: GamePageProps) {
   }
 
   function handleBuyIn() {
-    if (!gameData) return;
-    if ((allowance.data ?? 0n) < gameData[2]) {
+    if (!gameData || allowanceAmount === undefined) return;
+    if (allowanceAmount < gameData[2]) {
       writes.approve(gameData[1], gameData[2]);
       return;
     }
@@ -97,8 +105,8 @@ export function GamePage({ gameId }: GamePageProps) {
         <section className="stack">
           <h2>Buy in</h2>
           <p>Your buy-ins: {((connectedBuyInCount.data as bigint | undefined) ?? 0n).toString()}</p>
-          <button className="primary-button" type="button" disabled={writes.isPending} onClick={handleBuyIn}>
-            {(allowance.data ?? 0n) < (gameData?.[2] ?? 0n) ? "Approve buy-in" : "Buy in"}
+          <button className="primary-button" type="button" disabled={writes.isPending || !allowanceReady} onClick={handleBuyIn}>
+            {buyInButtonLabel}
           </button>
         </section>
       ) : null}
@@ -163,18 +171,29 @@ export function GamePage({ gameId }: GamePageProps) {
         )}
       </section>
 
-      {gameData?.[3] === 1 && payouts.data ? (
-        <section className="stack">
-          <h2>Final payouts</h2>
-          <ul>
-            {(payouts.data as readonly [`0x${string}`[], bigint[]])[0].map((recipient, index) => (
-              <li key={`${recipient}-${index}`}>
-                {recipient}:{" "}
-                {formatTokenAmount((payouts.data as readonly [`0x${string}`[], bigint[]])[1][index] ?? 0n, TOKEN_DECIMALS)}
-              </li>
-            ))}
-          </ul>
-        </section>
+      {gameData?.[3] === 1 ? (
+        payouts.isLoading ? (
+          <p className="muted">Loading final payouts...</p>
+        ) : payouts.error ? (
+          <p className="error-text" role="alert">
+            {payouts.error.message}
+          </p>
+        ) : payouts.data ? (
+          <section className="stack">
+            <h2>Final payouts</h2>
+            <ul>
+              {(payouts.data as readonly [`0x${string}`[], bigint[]])[0].map((recipient, index) => (
+                <li key={`${recipient}-${index}`}>
+                  {recipient}:{" "}
+                  {formatTokenAmount(
+                    (payouts.data as readonly [`0x${string}`[], bigint[]])[1][index] ?? 0n,
+                    TOKEN_DECIMALS,
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null
       ) : null}
 
       {permissions.canFinalize && gameData ? (

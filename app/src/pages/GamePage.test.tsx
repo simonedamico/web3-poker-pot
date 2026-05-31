@@ -74,7 +74,11 @@ describe("GamePage", () => {
     hookState.participantBuyIns.data = [{ account: addresses.participant, count: 2n }];
     hookState.connectedBuyInCount.data = 2n;
     hookState.allowance.data = 0n;
+    hookState.allowance.isLoading = false;
+    hookState.allowance.error = null;
     hookState.payouts.data = undefined;
+    hookState.payouts.isLoading = false;
+    hookState.payouts.error = null;
     hookState.writes.approve.mockReset();
     hookState.writes.buyIn.mockReset();
     hookState.writes.setWhitelist.mockReset();
@@ -104,6 +108,20 @@ describe("GamePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Approve buy-in" }));
 
     expect(hookState.writes.approve).toHaveBeenCalledWith(addresses.token, 25_000_000n);
+    expect(hookState.writes.buyIn).not.toHaveBeenCalled();
+  });
+
+  it("disables buy-in actions while allowance is still loading", () => {
+    hookState.allowance.data = undefined;
+    hookState.allowance.isLoading = true;
+
+    render(<GamePage gameId={1n} />);
+
+    const button = screen.getByRole("button", { name: "Checking allowance" });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+
+    expect(hookState.writes.approve).not.toHaveBeenCalled();
     expect(hookState.writes.buyIn).not.toHaveBeenCalled();
   });
 
@@ -158,5 +176,19 @@ describe("GamePage", () => {
 
     expect(screen.getByRole("heading", { name: "Final payouts" })).toBeInTheDocument();
     expect(screen.getByText(`${addresses.participant}: 50`)).toBeInTheDocument();
+  });
+
+  it("renders finalized payout loading and error states", () => {
+    hookState.game.data = [addresses.organiser, addresses.token, 25_000_000n, 1, 50_000_000n];
+    hookState.payouts.isLoading = true;
+    const { rerender } = render(<GamePage gameId={1n} />);
+
+    expect(screen.getByText("Loading final payouts...")).toBeInTheDocument();
+
+    hookState.payouts.isLoading = false;
+    hookState.payouts.error = new Error("Payout read reverted.");
+    rerender(<GamePage gameId={1n} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Payout read reverted.");
   });
 });
