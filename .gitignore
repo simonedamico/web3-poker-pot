@@ -8,3 +8,4 @@ artifacts/
 coverage/
 app/dist/
 .env
+*.tsbuildinfo
