@@ -264,7 +264,7 @@ describe("GamePage", () => {
 
     fireEvent.change(screen.getByLabelText("Whitelist account"), { target: { value: addresses.other } });
     fireEvent.click(screen.getByRole("button", { name: "Add to whitelist" }));
-    fireEvent.click(screen.getByRole("button", { name: `Remove ${addresses.participant}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     fireEvent.change(screen.getByLabelText("Recipient 1"), { target: { value: addresses.participant } });
     fireEvent.change(screen.getByLabelText("Amount 1"), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: "Finalize payouts" }));
