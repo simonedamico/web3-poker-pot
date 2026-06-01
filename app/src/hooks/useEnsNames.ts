@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { createPublicClient, getAddress, http, isAddress } from "viem";
+import { createPublicClient, fallback, getAddress, http, isAddress } from "viem";
 import { mainnet } from "viem/chains";
-import { usePublicClient } from "wagmi";
 import { type EnsNameResolver } from "../lib/address";
 
 type EnsClient = {
@@ -10,9 +9,11 @@ type EnsClient = {
   getEnsName: (parameters: { address: `0x${string}` }) => Promise<string | null>;
 };
 
+const MAINNET_ENS_RPC_URLS = ["https://ethereum.publicnode.com", "https://1rpc.io/eth"] as const;
+
 const mainnetEnsClient = createPublicClient({
   chain: mainnet,
-  transport: http(),
+  transport: fallback(MAINNET_ENS_RPC_URLS.map((url) => http(url, { timeout: 8_000 }))),
 });
 
 export function ensAddressKey(address: `0x${string}`): string {
@@ -23,30 +24,13 @@ export function addressDisplayLabel(address: `0x${string}`, ensName?: string): s
   return ensName ? `${address} (${ensName})` : address;
 }
 
-function chainSupportsEns(client: EnsClient | null | undefined): client is EnsClient {
-  if (!client?.chain || typeof client.chain !== "object" || !("contracts" in client.chain)) {
-    return false;
-  }
-
-  const contracts = (client.chain as { contracts?: unknown }).contracts;
-  if (!contracts || typeof contracts !== "object") {
-    return false;
-  }
-
-  return "ensRegistry" in contracts || "ensUniversalResolver" in contracts;
-}
-
-function ensClient(activeClient: EnsClient | null | undefined, fallbackClient: EnsClient = mainnetEnsClient): EnsClient {
-  return chainSupportsEns(activeClient) ? activeClient : fallbackClient;
-}
-
 export function createEnsNameResolver(
-  activeClient: EnsClient | null | undefined,
-  fallbackClient: EnsClient = mainnetEnsClient,
+  _activeClient: EnsClient | null | undefined,
+  mainnetClient: EnsClient = mainnetEnsClient,
 ): EnsNameResolver {
   return async (name: string) => {
     try {
-      const resolved = await ensClient(activeClient, fallbackClient).getEnsAddress({ name });
+      const resolved = await mainnetClient.getEnsAddress({ name });
       return resolved && isAddress(resolved) ? getAddress(resolved) : null;
     } catch {
       return null;
@@ -56,15 +40,14 @@ export function createEnsNameResolver(
 
 export async function loadEnsReverseNames(
   addresses: readonly `0x${string}`[],
-  activeClient: EnsClient | null | undefined,
-  fallbackClient: EnsClient = mainnetEnsClient,
+  _activeClient: EnsClient | null | undefined,
+  mainnetClient: EnsClient = mainnetEnsClient,
 ) {
-  const client = ensClient(activeClient, fallbackClient);
   const uniqueAddresses = Array.from(new Set(addresses.map((address) => getAddress(address))));
   const rows = await Promise.all(
     uniqueAddresses.map(async (address) => {
       try {
-        const name = await client.getEnsName({ address });
+        const name = await mainnetClient.getEnsName({ address });
         return name ? ([ensAddressKey(address), name] as const) : undefined;
       } catch {
         return undefined;
@@ -81,12 +64,10 @@ export async function loadEnsReverseNames(
 }
 
 export function useEnsNameResolver(): EnsNameResolver {
-  const publicClient = usePublicClient();
-  return useCallback(createEnsNameResolver(publicClient), [publicClient]);
+  return useCallback(createEnsNameResolver(undefined), []);
 }
 
 export function useEnsReverseNames(addresses: readonly (`0x${string}` | undefined)[]) {
-  const publicClient = usePublicClient();
   const [namesByAddress, setNamesByAddress] = useState<Record<string, string>>({});
   const addressKey = addresses
     .filter((address): address is `0x${string}` => Boolean(address))
@@ -103,7 +84,7 @@ export function useEnsReverseNames(addresses: readonly (`0x${string}` | undefine
     }
 
     let cancelled = false;
-    void loadEnsReverseNames(uniqueAddresses, publicClient).then((names) => {
+    void loadEnsReverseNames(uniqueAddresses, undefined).then((names) => {
       if (cancelled) return;
       setNamesByAddress(names);
     });
@@ -111,7 +92,7 @@ export function useEnsReverseNames(addresses: readonly (`0x${string}` | undefine
     return () => {
       cancelled = true;
     };
-  }, [addressKey, publicClient]);
+  }, [addressKey]);
 
   return namesByAddress;
 }
